@@ -46,7 +46,8 @@ const DataTable = ({ data = [], source,title,subtitle }) => {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const rowsPerPage = 10;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [showAllRows, setShowAllRows] = useState(false);
 
   // Get dynamic columns from first data item
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
@@ -167,9 +168,9 @@ const DataTable = ({ data = [], source,title,subtitle }) => {
   };
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
+  const totalPages = showAllRows ? 1 : Math.ceil(filteredData.length / rowsPerPage);
+  const startIndex = showAllRows ? 0 : (currentPage - 1) * rowsPerPage;
+  const endIndex = showAllRows ? filteredData.length : startIndex + rowsPerPage;
   const currentData = filteredData.slice(startIndex, endIndex);
 
   // Generate page numbers for pagination
@@ -410,6 +411,31 @@ const DataTable = ({ data = [], source,title,subtitle }) => {
             </Button>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+  <select
+    className="p-2 border rounded-md text-sm dark:bg-slate-800 dark:border-slate-700"
+    value={showAllRows ? 'all' : rowsPerPage}
+    onChange={(e) => {
+      const value = e.target.value;
+      if (value === 'all') {
+        setShowAllRows(true);
+        setCurrentPage(1);
+      } else {
+        setShowAllRows(false);
+        setRowsPerPage(Number(value));
+        setCurrentPage(1);
+      }
+    }}
+  >
+    <option value="5">5 rows</option>
+    <option value="10">10 rows</option>
+    <option value="20">20 rows</option>
+    <option value="50">50 rows</option>
+    <option value="100">100 rows</option>
+    <option value="all">Show all</option>
+  </select>
+</div>
       </CardHeader>
       <CardContent>
         <div className="relative">
@@ -488,7 +514,7 @@ const DataTable = ({ data = [], source,title,subtitle }) => {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {!showAllRows && totalPages > 1 && (
           <div className="mt-6">
             <Pagination>
               <PaginationContent>

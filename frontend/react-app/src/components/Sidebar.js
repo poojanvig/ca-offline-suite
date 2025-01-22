@@ -37,8 +37,8 @@ const SidebarDynamic = ({ navItems, activeTab, setActiveTab }) => {
   const navigate = useNavigate();
   const { isCollapsed } = useSidebar();
   const [user] = React.useState({
-    name: "Raj Singh",
-    email: "rajsingh08471@gmail.com",
+    name: "Demo user",
+    email: "demo@gmail.com",
     avatar: "#",
   });
   const [openMenus, setOpenMenus] = React.useState({});
@@ -114,7 +114,7 @@ const SidebarDynamic = ({ navItems, activeTab, setActiveTab }) => {
         <button className="flex items-center w-full p-2 hover:bg-gray-100 rounded-md transition-all duration-200">
           <Avatar className="h-8 w-8 rounded-lg">
             <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback className="rounded-lg">HJ</AvatarFallback>
+            <AvatarFallback className="rounded-lg">DU</AvatarFallback>
           </Avatar>
           {!isCollapsed && (
             <>
@@ -133,7 +133,7 @@ const SidebarDynamic = ({ navItems, activeTab, setActiveTab }) => {
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8 rounded-lg">
               <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>HJ</AvatarFallback>
+              <AvatarFallback>DU</AvatarFallback>
             </Avatar>
             <div>
               <p className="text-sm font-medium">{user.name}</p>

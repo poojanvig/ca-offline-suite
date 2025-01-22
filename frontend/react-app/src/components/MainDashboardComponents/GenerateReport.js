@@ -174,6 +174,7 @@ export default function GenerateReport() {
     { id: 3, message: "New comment on your post." },
   ];
 
+  
   return (
     <div className="p-8 pt-0 space-y-8 bg-white dark:bg-black min-h-screen">
       <div className="flex justify-between items-center">

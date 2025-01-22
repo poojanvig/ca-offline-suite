@@ -249,43 +249,43 @@ const CaseDashboard = () => {
       ],
       alwaysOpen: true,
     },
-    {
-      title: "Name Manager",
-      url: "#",
-      icon: Merge,
-      isActive: true,
-    },
-    {
-      title: "Network Graph",
-      url: "#",
-      icon: Waypoints,
-    },
-    {
-      title: "Entity Distribution",
-      url: "#",
-      icon: TableProperties,
-    },
+    // {
+    //   title: "Name Manager",
+    //   url: "#",
+    //   icon: Merge,
+    //   isActive: true,
+    // },
+    // {
+    //   title: "Network Graph",
+    //   url: "#",
+    //   icon: Waypoints,
+    // },
+    // {
+    //   title: "Entity Distribution",
+    //   url: "#",
+    //   icon: TableProperties,
+    // },
     
-    {
-      title: "Link Analysis",
-      url: "#",
-      icon: Cable,
-    },
-    {
-      title: "Bi-Directional Analysis",
-      url: "#",
-      icon: ArrowRightLeft,
-    },
-    {
-      title: "FIFO LIFO",
-      url: "#",
-      icon: ArrowDownUp,
-    },
-    {
-      title: "Fund Tracking",
-      url: "#",
-      icon: Banknote,
-    },
+    // {
+    //   title: "Link Analysis",
+    //   url: "#",
+    //   icon: Cable,
+    // },
+    // {
+    //   title: "Bi-Directional Analysis",
+    //   url: "#",
+    //   icon: ArrowRightLeft,
+    // },
+    // {
+    //   title: "FIFO LIFO",
+    //   url: "#",
+    //   icon: ArrowDownUp,
+    // },
+    // {
+    //   title: "Fund Tracking",
+    //   url: "#",
+    //   icon: Banknote,
+    // },
   ];
 
   useEffect(() => {

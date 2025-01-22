@@ -58,62 +58,62 @@ const RecentReports = () => {
   const [recentReports, setRecentReports] = useState([
     {
       date: "13-12-2024",
-      reportName: "Report_ATS_unit_1_00008",
+      reportName: "CASE_00008",
       status: "Completed",
     },
     {
       date: "13-12-2024",
-      reportName: "Report_ATS_unit_1_00007",
+      reportName: "CASE_00007",
       status: "Completed",
     },
     {
       date: "12-12-2024",
-      reportName: "Report_ATS_unit_1_00003",
+      reportName: "CASE_00003",
       status: "In Progress",
     },
     {
       date: "12-12-2024",
-      reportName: "Report_ATS_unit_1_00002",
+      reportName: "CASE_00002",
       status: "Failed",
     },
     {
       date: "12-12-2024",
-      reportName: "Report_ATS_unit_1_00001",
+      reportName: "CASE_00001",
       status: "Completed",
     },
     {
       date: "11-12-2024",
-      reportName: "Report_ATS_unit_1_00006",
+      reportName: "CASE_00006",
       status: "In Progress",
     },
     {
       date: "11-12-2024",
-      reportName: "Report_ATS_unit_1_00005",
+      reportName: "CASE_00005",
       status: "Completed",
     },
     {
       date: "11-12-2024",
-      reportName: "Report_ATS_unit_1_00004",
+      reportName: "CASE_00004",
       status: "Failed",
     },
     {
       date: "10-12-2024",
-      reportName: "Report_ATS_unit_1_00009",
+      reportName: "CASE_00009",
       status: "Completed",
     },
     {
       date: "10-12-2024",
-      reportName: "Report_ATS_unit_1_00010",
+      reportName: "CASE_00010",
       status: "In Progress",
     },
     {
       date: "10-12-2024",
-      reportName: "Report_ATS_unit_1_00011",
+      reportName: "CASE_00011",
       status: "Completed",
     },
     {
       date: "10-12-2024",
-      reportName: "Report_ATS_unit_1_00012",
+      reportName: "CASE_00012",
       status: "Completed",
     },
   ]);
@@ -121,7 +121,7 @@ const RecentReports = () => {
   const reportInfoData = [
     {
       id: 1,
-      reportName: "Report_ATS_unit_1_00008",
+      reportName: "CASE_00008",
       documents: [
         {
           path: "C:/Users/documents/Reports/2024/January/Statement_Analysis_1.pdf",
@@ -135,7 +135,7 @@ const RecentReports = () => {
     },
     {
       id: 2,
-      reportName: "Report_ATS_unit_1_00007",
+      reportName: "CASE_00007",
       documents: [
         {
           path: "C:/Users/documents/Reports/2024/February/Client_Statement.pdf",
@@ -149,7 +149,7 @@ const RecentReports = () => {
     },
     {
       id: 3,
-      reportName: "Report_ATS_unit_1_00006",
+      reportName: "CASE_00006",
       documents: [
         {
           path: "C:/Users/documents/Reports/2024/March/Corporate_Statement.pdf",
@@ -273,7 +273,8 @@ const RecentReports = () => {
   const handleView = (caseId) => {
     console.log({ isLoading });
     setIsLoading(true);
-    navigate(`/case-dashboard/${caseId}/defaultTab`);
+    // navigate(`/case-dashboard/${caseId}/defaultTab`);
+    navigate(`/individual-dashboard/${caseId}/${1}/defaultTab`);
     setIsLoading(false);
   };
 
