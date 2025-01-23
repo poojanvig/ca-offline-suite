@@ -170,7 +170,7 @@ const DataTable = ({ data = [], source,title,subtitle }) => {
   // Pagination calculations
   const totalPages = showAllRows ? 1 : Math.ceil(filteredData.length / rowsPerPage);
   const startIndex = showAllRows ? 0 : (currentPage - 1) * rowsPerPage;
-  const endIndex = showAllRows ? filteredData.length : startIndex + rowsPerPage;
+  const endIndex = showAllRows ? filteredData.length : (startIndex + rowsPerPage);
   const currentData = filteredData.slice(startIndex, endIndex);
 
   // Generate page numbers for pagination
@@ -388,55 +388,54 @@ const DataTable = ({ data = [], source,title,subtitle }) => {
   return (
     // if source is equal to lifo or fifo then show the table
     <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <CardTitle className="dark:text-slate-300">{title || "Data Table"}</CardTitle>
-            <CardDescription>{subtitle||"View and manage your data"}</CardDescription>
-          </div>
-          <div className="relative flex items-center gap-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              className="pl-10 w-[400px]"
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-            <Button
-              className="dark:bg-slate-300 dark:hover:bg-slate-200"
-              variant="default"
-              onClick={() => clearFilters()}
-            >
-              Clear Filters
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-  <select
-    className="p-2 border rounded-md text-sm dark:bg-slate-800 dark:border-slate-700"
-    value={showAllRows ? 'all' : rowsPerPage}
-    onChange={(e) => {
-      const value = e.target.value;
-      if (value === 'all') {
-        setShowAllRows(true);
-        setCurrentPage(1);
-      } else {
-        setShowAllRows(false);
-        setRowsPerPage(Number(value));
-        setCurrentPage(1);
-      }
-    }}
-  >
-    <option value="5">5 rows</option>
-    <option value="10">10 rows</option>
-    <option value="20">20 rows</option>
-    <option value="50">50 rows</option>
-    <option value="100">100 rows</option>
-    <option value="all">Show all</option>
-  </select>
-</div>
-      </CardHeader>
+     <CardHeader>
+  <div className="flex justify-between items-center">
+    <div className="space-y-2">
+      <CardTitle className="dark:text-slate-300">{title || "Data Table"}</CardTitle>
+      <CardDescription>{subtitle||"View and manage your data"}</CardDescription>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="relative flex items-center gap-2">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search..."
+          className="pl-10 w-[300px]"
+          value={searchTerm}
+          onChange={(e) => handleSearch(e.target.value)}
+        />
+        <select
+          className="p-2 border rounded-md text-sm dark:bg-slate-800 dark:border-slate-700 w-[120px]"
+          value={showAllRows ? 'all' : rowsPerPage}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === 'all') {
+              setShowAllRows(true);
+              setCurrentPage(1);
+            } else {
+              setShowAllRows(false);
+              setRowsPerPage(Number(value));
+              setCurrentPage(1);
+            }
+          }}
+        >
+          <option value="5">5 rows</option>
+          <option value="10">10 rows</option>
+          <option value="20">20 rows</option>
+          <option value="50">50 rows</option>
+          <option value="100">100 rows</option>
+          <option value="all">Show all</option>
+        </select>
+        <Button
+          className="dark:bg-slate-300 dark:hover:bg-slate-200"
+          variant="default"
+          onClick={() => clearFilters()}
+        >
+          Clear Filters
+        </Button>
+      </div>
+    </div>
+  </div>
+</CardHeader>
       <CardContent>
         <div className="relative">
           <Table>

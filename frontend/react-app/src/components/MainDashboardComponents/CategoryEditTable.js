@@ -54,7 +54,6 @@ const CategoryEditTable = ({ data = [], categoryOptions,setCategoryOptions }) =>
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const rowsPerPage = 10;
   const { toast } = useToast();
   const [hasChanges, setHasChanges] = useState(false);
   const [currentData, setCurrentdata] = useState([]);
@@ -83,6 +82,9 @@ const CategoryEditTable = ({ data = [], categoryOptions,setCategoryOptions }) =>
   const [reasoning, setReasoning] = useState("");
   const [pendingCategoryChange, setPendingCategoryChange] = useState(null);
   const [bulkReasoning, setBulkReasoning] = useState("");
+  
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [showAllRows, setShowAllRows] = useState(false);
 
   useEffect(() => {
     setTransactions(data);
@@ -338,14 +340,14 @@ const CategoryEditTable = ({ data = [], categoryOptions,setCategoryOptions }) =>
 
 
   useEffect(() => {
-    const totalPagesTemp = Math.ceil(filteredData.length / rowsPerPage);
+    const totalPagesTemp =  showAllRows ? 1 : Math.ceil(filteredData.length / rowsPerPage);
     setTotalPages(totalPagesTemp);
-    const startIndexTemp = (currentPage - 1) * rowsPerPage;
+    const startIndexTemp =showAllRows ? 0 : (currentPage - 1) * rowsPerPage;
     setStartIndex(startIndexTemp);
-    const endIndexTemp = startIndexTemp + rowsPerPage;
+    const endIndexTemp = showAllRows ? filteredData.length : (startIndexTemp + rowsPerPage);
     setEndIndex(endIndexTemp);
     setCurrentdata(filteredData.slice(startIndexTemp, endIndexTemp));
-  }, [filteredData, currentPage]);
+  }, [filteredData, currentPage,rowsPerPage,showAllRows]);
 
   const getPageNumbers = () => {
     const pageNumbers = [];
@@ -424,6 +426,28 @@ const CategoryEditTable = ({ data = [], categoryOptions,setCategoryOptions }) =>
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
             />
+              <select
+          className="p-2 border rounded-md text-sm dark:bg-slate-800 dark:border-slate-700 w-[120px]"
+          value={showAllRows ? 'all' : rowsPerPage}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === 'all') {
+              setShowAllRows(true);
+              setCurrentPage(1);
+            } else {
+              setShowAllRows(false);
+              setRowsPerPage(Number(value));
+              setCurrentPage(1);
+            }
+          }}
+        >
+          <option value="5">5 rows</option>
+          <option value="10">10 rows</option>
+          <option value="20">20 rows</option>
+          <option value="50">50 rows</option>
+          <option value="100">100 rows</option>
+          <option value="all">Show all</option>
+        </select>
             <Button variant="default" onClick={() => clearFilters()}>
               Clear Filters
             </Button>
