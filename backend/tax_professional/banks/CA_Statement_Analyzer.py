@@ -19,7 +19,7 @@ from ...utils import get_saved_pdf_dir
 TEMP_SAVED_PDF_DIR = get_saved_pdf_dir()
 
 from ...common_functions import (process_excel_to_json,process_name_n_num_df,category_add_ca,
-                              another_method,eod,opening_and_closing_bal,summary_sheet,
+                              another_method,Upi,eod,opening_and_closing_bal,summary_sheet,
                               transaction_sheet,total_investment,redemption_investment,
                               creditor_list,debtor_list, cash_withdraw, cash_depo, div_int, emi,
                               refund_reversal, suspense_credit, suspense_debit, payment,receipt,
