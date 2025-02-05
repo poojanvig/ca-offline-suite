@@ -1063,7 +1063,7 @@ def pmt_bl():
     return payment
 
 
-def category_add_ca(self, df):
+def category_add_ca(df):
     x = df["Balance"]
     df["Debit"] = pd.to_numeric(df["Debit"], errors="coerce")
     df["Credit"] = pd.to_numeric(df["Credit"], errors="coerce")
