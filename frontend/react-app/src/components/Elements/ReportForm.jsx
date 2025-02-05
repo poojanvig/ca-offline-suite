@@ -24,7 +24,7 @@ import { Input } from "../ui/input";
 const GenerateReportForm = ({
   currentCaseName = null,
   handleReportSubmit,
-  onReportGenerated,
+  onReportGenerated
 }) => {
   const [unit, setUnit] = useState("Unit 1");
   const [units, setUnits] = useState(["Unit 1", "Unit 2"]);
@@ -104,6 +104,7 @@ const GenerateReportForm = ({
     "CBI",
     "SURAT",
     "JANKALYAN",
+    "Other"
   ];
 
   // Add this useEffect after your other useEffect declarations
@@ -216,7 +217,6 @@ const GenerateReportForm = ({
     </Select>
   );
 
-
   // Load the last case number from localStorage on component mount
   useEffect(() => {
     const savedLastNumber = localStorage.getItem("lastCaseNumber");
@@ -275,7 +275,9 @@ const GenerateReportForm = ({
         description: (
           <div className="mt-2 w-full flex items-center gap-2">
             <div className="flex items-center gap-4">
-              <CircularProgress value={progress} className="w-full" />
+              {/* <CircularProgress value={progress} className="w-full" /> */}
+              <Loader2 className="w-6 h-6 animate-spin" />
+
               {/* <span className="text-sm font-medium">{progress}%</span> */}
             </div>
             <p className="text-sm text-gray-500">
@@ -352,11 +354,10 @@ const GenerateReportForm = ({
 
   // console.log("Current Case Name: ", caseName);
 
-  
   const validateForm = () => {
     // Check if any file is missing bank selection
-    const missingBanks = fileDetails.some(detail => !detail.bankName);
-    
+    const missingBanks = fileDetails.some((detail) => !detail.bankName);
+
     if (missingBanks) {
       toast({
         title: "Error",
@@ -374,12 +375,12 @@ const GenerateReportForm = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log("Inside handleSubmit..", caseName);
-    
+
     if (!validateForm()) {
       return;
     }
 
-    if (!caseName) {
+    if (!caseName && !currentCaseName) {
       toast({
         title: "Error",
         description: "Please enter a report name",
@@ -389,22 +390,24 @@ const GenerateReportForm = ({
       return;
     }
 
-    try {
-      // Check if report name exists
-      const response = await window.electron.getReportNameExists({
-        reportName: caseName,
-      });
 
-      if (response.exists) {
-        toast({
-          title: "Error",
-          description:
-            "Report name already exists. Please choose a different name.",
-          variant: "destructive",
-          duration: 3000,
+    try {
+       if(caseName){ // Check if report name exists
+        const response = await window.electron.getReportNameExists({
+          reportName: caseName || currentCaseName,
         });
-        return;
-      }
+        
+        console.log({response})
+        if (response.exists) {
+          toast({
+            title: "Error",
+            description:
+              "Report name already exists. Please choose a different name.",
+            variant: "destructive",
+            duration: 3000,
+          });
+          return;
+        }}
 
       // If report name is unique, proceed with report generation
       handleReportSubmit(
@@ -415,13 +418,13 @@ const GenerateReportForm = ({
         fileDetails,
         setSelectedFiles,
         setFileDetails,
-        setCaseName,
         toast,
         progressIntervalRef,
         simulateProgress,
         convertDateFormat,
-        caseName,
+        caseName || currentCaseName
       );
+
     } catch (error) {
       console.error("Error checking report name:", error);
       toast({
@@ -557,11 +560,15 @@ const GenerateReportForm = ({
   };
 
   const handleFileChange = (e) => {
+    console.log("Inside handleFileChange..");
+    console.log({e:e.target})
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
 
       // Combine new files with existing files
       const combinedFiles = [...selectedFiles, ...newFiles];
+      
+      console.log({newFiles,combinedFiles})
 
       // Remove duplicates based on file name and size
       const uniqueFiles = combinedFiles.filter(
@@ -569,6 +576,8 @@ const GenerateReportForm = ({
           index ===
           self.findIndex((f) => f.name === file.name && f.size === file.size)
       );
+
+      console.log({uniqueFiles})
 
       setSelectedFiles(uniqueFiles);
 
@@ -598,12 +607,19 @@ const GenerateReportForm = ({
   };
 
   const removeFile = (indexToRemove) => {
-    setSelectedFiles((prevFiles) =>
-      prevFiles.filter((_, index) => index !== indexToRemove)
-    );
-    setFileDetails((prevDetails) =>
-      prevDetails.filter((_, index) => index !== indexToRemove)
-    );
+    console.log({removeFile: indexToRemove})
+    let tempSelectedFiles = [...selectedFiles];
+    let tempFileDetails = [...fileDetails];
+
+    console.log({tempSelectedFiles, tempFileDetails})
+
+    tempSelectedFiles= tempSelectedFiles.filter((_, index) => index !== indexToRemove)
+    tempFileDetails= tempFileDetails.filter((_, index) => index !== indexToRemove)
+
+    console.log({tempSelectedFiles, tempFileDetails})
+
+    setSelectedFiles(tempSelectedFiles);
+    setFileDetails(tempFileDetails);
   };
 
   return (
@@ -687,9 +703,9 @@ const GenerateReportForm = ({
             </div>
 
             <div>
-              <h1 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {/* <h1 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Add Bank Statements
-              </h1>
+              </h1> */}
 
               <div className="flex items-center justify-center space-x-4 w-full mb-6">
                 <label className="text-md font-medium text-gray-700 dark:text-gray-300">

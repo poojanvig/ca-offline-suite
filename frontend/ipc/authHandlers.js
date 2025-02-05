@@ -2,13 +2,16 @@ const { ipcMain } = require('electron');
 const sessionManager = require('../SessionManager');
 const log = require('electron-log');
 const licenseManager = require('../LicenseManager');
-const db = require('../db/db');
 const { users } = require('../db/schema/User');
 const bcrypt = require('bcrypt');
+const databaseManager = require('../db/db');
 
 const { eq, exists, sql } = require("drizzle-orm");
 
 function registerAuthHandlers() {
+    const db = databaseManager.getInstance().getDatabase();
+    log.info("Database instance : ", db);
+
     log.info('Registering auth IPC handlers');
     // Handle login
     ipcMain.handle('auth:login', async (event, credentials) => {
@@ -32,7 +35,7 @@ function registerAuthHandlers() {
             }
 
             // Set the user session
-            const licenseKey = await licenseManager.getLicenseKey();
+            const { licenseKey, uuidHash } = await licenseManager.getLicenseKey();
             console.log("License key:", licenseKey);
 
             if (!licenseKey) {
@@ -40,7 +43,7 @@ function registerAuthHandlers() {
             }
 
             // Validate the license
-            const result = await licenseManager.validateLicense(licenseKey, credentials.email);
+            const result = await licenseManager.validateLicense(licenseKey, credentials.email, uuidHash, true);
             console.log("License activation result:", result);
 
             if (!result.success) {

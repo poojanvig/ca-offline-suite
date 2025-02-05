@@ -16,8 +16,8 @@ import { pdfjs, Document, Page } from "react-pdf"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs"
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()
-
+// pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 const COLUMN_TYPES = [
   { id: "date", label: "📅 Date" },
   { id: "description", label: "📝 Description" },
@@ -50,13 +50,13 @@ const initialConfigTest = {
   ],
   
 }
-const PDFColumnMarker = ({ addColsToStatementData, pdfName,initialConfig = initialConfigTest }) => {
+const PDFColumnMarker = ({ addColsToStatementData, pdfPath,initialConfig = initialConfigTest }) => {
   const [columnLines, setColumnLines] = useState([])
   const [columnLabels, setColumnLabels] = useState([])
   const [pdfFile, setPdfFile] = useState(null)
   const [numPages, setNumPages] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [scale, setScale] = useState(1.4)
+  const [scale, setScale] = useState(1.2)
   const [editingLabelIndex, setEditingLabelIndex] = useState(null)
   const [draggingLineIndex, setDraggingLineIndex] = useState(null)
   const [draggingLabelIndex, setDraggingLabelIndex] = useState(null)
@@ -100,10 +100,12 @@ const PDFColumnMarker = ({ addColsToStatementData, pdfName,initialConfig = initi
   }, [initialConfig, pdfBlob])
 
   useEffect(() => {
-    window.electron.fetchPdfContent(pdfName)
+    console.log({OpeningPDf:pdfPath})
+    window.electron.fetchPdfContent(pdfPath)
       .then(base64 => {
         const blob = base64StringToBlob(base64, 'application/pdf');
         setPdfBlob(URL.createObjectURL(blob));
+        console.log('Fetched PDF:', blob);
       })
       .catch(err => console.error('Failed to fetch PDF:', err));
   }, []);
@@ -339,8 +341,8 @@ const PDFColumnMarker = ({ addColsToStatementData, pdfName,initialConfig = initi
       columns,
     }
 
-    console.log({pdfName,config})
-    addColsToStatementData(pdfName,config.columns)
+    console.log({pdfPath,config})
+    addColsToStatementData(pdfPath,config.columns)
   }
 
   const updateHistory = (lines, labels) => {
@@ -500,6 +502,8 @@ const PDFColumnMarker = ({ addColsToStatementData, pdfName,initialConfig = initi
               onMouseUp={handleDragEnd}
               onMouseLeave={handleDragEnd}
             >
+
+              {console.log({pdfBlob})}
               <Document className={"overflow-auto"} style={{overflow:"auto"}} file={pdfBlob} onLoadSuccess={onDocumentLoadSuccess}>
                 <Page pageNumber={currentPage} scale={scale} renderTextLayer={false} renderAnnotationLayer={false} />
                 {/* 

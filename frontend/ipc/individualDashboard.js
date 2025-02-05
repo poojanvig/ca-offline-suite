@@ -1,6 +1,6 @@
 const { ipcMain } = require("electron");
 const log = require("electron-log");
-const db = require("../db/db");
+const databaseManager = require('../db/db');
 const { statements } = require("../db/schema/Statement");
 const { transactions } = require("../db/schema/Transactions");
 const { eod } = require("../db/schema/Eod");
@@ -8,6 +8,8 @@ const { summary } = require("../db/schema/Summary");
 const { eq, gt, and, inArray } = require("drizzle-orm"); // Add this import
 
 function registerIndividualDashboardIpc() {
+  const db = databaseManager.getInstance().getDatabase();
+  log.info("Database instance : ", db);
   // Handler for getting EOD balance
   ipcMain.handle("get-eod-balance", async (event, caseId) => {
     if (!caseId) {
@@ -48,9 +50,14 @@ function registerIndividualDashboardIpc() {
       if (individualId) {
         console.log("individualId", individualId);
         const allTransactions = await db
-          .select()
+          .select({
+            id: transactions.id,
+            ...transactions
+          })
           .from(transactions)
           .where(and(eq(transactions.statementId, individualId.toString())));
+
+        log.info({ allTransactions: allTransactions.length })
         return allTransactions;
       } else {
         const allStatements = await db
@@ -65,7 +72,10 @@ function registerIndividualDashboardIpc() {
         // log.info("Found statements:", allStatements);
         // Get all transactions for these statements
         const allTransactions = await db
-          .select()
+          .select({
+            id: transactions.id,
+            ...transactions
+          })
           .from(transactions)
           .where(
             inArray(
@@ -131,7 +141,10 @@ function registerIndividualDashboardIpc() {
       try {
         if (individualId) {
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -149,7 +162,10 @@ function registerIndividualDashboardIpc() {
           const statementIds = allStatements.map((stmt) => stmt.id.toString());
 
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -173,7 +189,10 @@ function registerIndividualDashboardIpc() {
       try {
         if (individualId) {
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -191,7 +210,10 @@ function registerIndividualDashboardIpc() {
           const statementIds = allStatements.map((stmt) => stmt.id.toString());
 
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -307,7 +329,10 @@ function registerIndividualDashboardIpc() {
       try {
         if (individualId) {
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -325,7 +350,10 @@ function registerIndividualDashboardIpc() {
           const statementIds = allStatements.map((stmt) => stmt.id.toString());
 
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -349,7 +377,10 @@ function registerIndividualDashboardIpc() {
       try {
         if (individualId) {
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(
@@ -367,7 +398,10 @@ function registerIndividualDashboardIpc() {
           const statementIds = allStatements.map((stmt) => stmt.id.toString());
 
           const result = await db
-            .select()
+            .select({
+              id: transactions.id,
+              ...transactions
+            })
             .from(transactions)
             .where(
               and(

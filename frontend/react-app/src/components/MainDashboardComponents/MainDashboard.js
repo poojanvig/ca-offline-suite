@@ -119,10 +119,10 @@ const MainDashboard = () => {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tight dark:text-slate-300">
-              Sanchay
+              Cyphersol
             </h2>
             <p className="text-muted-foreground">
-              Overview of Sanchay the great
+            Analytics Dashboard : 1.0.1-alpha , the update has been successfull
             </p>
           </div>
           <div className="flex items-center space-x-4">
@@ -195,8 +195,8 @@ const MainDashboard = () => {
             mainValueLabel="Statements Processed"
             percentageChange={10}
             bottomStats={[
-              { label: "Success", value: 100 },
-              { label: "Failed", value: 12 },
+              { label: "Success", value: "-" },
+              { label: "Failed", value: "-" },
             ]}
             // chartData={[
             //   { month: "Jan", value: 120 },
@@ -210,17 +210,17 @@ const MainDashboard = () => {
           <StatsMetricCard
             type="timeSaved"
             title="Time Saved"
-            mainValue="1200"
+            mainValue="-"
             mainValueLabel="Minutes Saved"
             percentageChange={25}
             breakdownData={[
-              { label: "Manual Processing", value: "800 mins" },
-              { label: "Automation", value: "400 mins" },
-              { label: "Optimization", value: "200 mins" },
+              { label: "Manual Processing", value: "- mins" },
+              { label: "Automation", value: "- mins" },
+              { label: "Optimization", value: "- mins" },
             ]}
             bottomStats={[
-              { label: "Average Time Saved/Day", value: "40 mins" },
-              { label: "Peak Savings", value: "100 mins" },
+              { label: "Average Time Saved/Day", value: "- mins" },
+              { label: "Peak Savings", value: "- mins" },
             ]}
           />
         </div>

@@ -32,7 +32,6 @@ export default function GenerateReport() {
     fileDetails,
     setSelectedFiles,
     setFileDetails,
-    setCaseId,
     toast,
     progressIntervalRef,
     simulateProgress,
@@ -100,14 +99,17 @@ export default function GenerateReport() {
           };
         })
       );
-      
-      console.log({caseName, filesWithContent});
+
+      console.log({ caseName, filesWithContent });
+
+      console.log({ caseName, filesWithContent });
 
       const result = await window.electron.generateReportIpc(
         {
           files: filesWithContent,
         },
-        caseName
+        caseName,
+        "generate-report"
       );
 
       console.log("Report generation result:", result.data);
@@ -122,17 +124,16 @@ export default function GenerateReport() {
           description: "Report generated successfully!",
           duration: 3000,
         });
-        if(result.data.failedFiles.length>0){
-          setShowRectifyButton(true);
-          const failedFiles = result.data.failedFiles.map((file_path)=>{
-            return file_path.split('\\').pop();
-          })
+        if (result.data.failedFiles.length > 0) {
+          // setShowRectifyButton(true);
+          const failedFiles = result.data.failedFiles.map((file_path) => {
+            return file_path.split("\\").pop();
+          });
           setFailedStatements(failedFiles || []); // Store failed
         }
-        
-        if(result.data.totalTransactions)
-          setShowAnalysisButton(true);
-        
+
+        if (result.data.totalTransactions) setShowAnalysisButton(true);
+
         // setFailedStatements(result.pdf_paths_not_extracted || []); // Store failed
 
         setDialogOpen(true); // Open the Dialog
@@ -152,7 +153,7 @@ export default function GenerateReport() {
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.log("Report generation failed:", {error:error.stack});
+      console.log("Report generation failed:", { error: error.stack });
 
       if (typeof error === "object" && error !== null) {
         console.error("Detailed error:", JSON.stringify(error, null, 2));
@@ -169,7 +170,9 @@ export default function GenerateReport() {
       clearInterval(progressIntervalRef.current);
       toast.dismiss(newToastId);
       setProgress(0);
-      setDialogOpen(true);
+      if (showAnalsisButton || showRectifyButton) {
+        setDialogOpen(true);
+      }
       toast({
         title: "Error",
         description: "Failed to generate report",
@@ -184,14 +187,14 @@ export default function GenerateReport() {
     }
   };
   const viewAnalysis = () => {
-    console.log("View Analysis clicked");
+    console.log("View Analysis clicked - ", currentCaseId);
     navigate(`/case-dashboard/${currentCaseId}/defaultTab`);
   };
 
   const handleRectify = () => {
+    setDialogOpen(false);
     console.log("Rectify clicked ", currentCaseId, currentCaseName);
-  }
-
+  };
 
   const notifications = [
     { id: 1, message: "You have a new message." },
@@ -204,7 +207,9 @@ export default function GenerateReport() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-
+  // const handleTestEdit = () => {
+  //   window.electron.excelFileDownload(5);
+  // };
 
   return (
     <div className="p-8 pt-0 space-y-8 bg-white dark:bg-black min-h-screen">
@@ -212,6 +217,7 @@ export default function GenerateReport() {
         <h2 className="text-3xl font-bold tracking-tight dark:text-slate-300">
           Report Generator
         </h2>
+        {/* <button onClick={handleTestEdit}>Test Excel download</button> */}
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
@@ -251,34 +257,32 @@ export default function GenerateReport() {
         />
       </div>
 
-      <RecentReports/>
+      <RecentReports key={refreshTrigger} onReportGenerated={refreshPage} />
 
       {/* Dialog for successful report generation */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Report Generated Successfully!</DialogTitle>
+          {failedStatements.length === 0 ? <DialogTitle>Alert</DialogTitle>:
+            <DialogTitle>Report Generated Successfully!</DialogTitle>}
             <DialogDescription className="flex items-end gap-x-4 pt-4 ">
-              {console.log("failedStatements from alert box ", failedStatements)}
+              {console.log(
+                "failedStatements from alert box ",
+                failedStatements
+              )}
               {failedStatements.length === 0 ? (
                 <div className="flex items-center gap-x-4">
-                <CheckCircle className="text-green-500 w-6 h-6 mt-2" />
-                <p>
-                Your report has been generated successfully.
-              </p>
+                  <CheckCircle className="text-green-500 w-6 h-6 mt-2" />
+                  <p>Your report has been generated successfully.</p>
                 </div>
               ) : failedStatements.length > 0 ? (
                 <div className="flex items-end gap-x-4">
-
-                <AlertTriangle className="text-yellow-500 w-6 h-6 mt-2" />
-                <p>
-                Below Statements had some errors.
-              </p>
-                </div >
+                  <AlertTriangle className="text-yellow-500 w-6 h-6 mt-2" />
+                  <p>Below Statements had some errors.</p>
+                </div>
               ) : (
                 <XCircle className="text-red-500 w-6 h-6 mt-2" />
               )}
-            
             </DialogDescription>
           </DialogHeader>
           {failedStatements.length > 0 && (
@@ -290,16 +294,19 @@ export default function GenerateReport() {
               </ul>
             </div>
           )}
-        <div className="flex gap-4">
-         {showAnalsisButton&& <Button onClick={() => viewAnalysis()} className="flex-1">
-            View Analysis
-          </Button>}
+          <div className="flex gap-4">
+            {showAnalsisButton && (
+              <Button onClick={() => viewAnalysis()} className="flex-1">
+                View Analysis
+              </Button>
+            )}
 
-          {showRectifyButton&& <Button onClick={handleRectify} className="flex-1">
-            Rectify Now
-          </Button>}
+            {showRectifyButton && (
+              <Button onClick={handleRectify} className="flex-1">
+                Rectify Now
+              </Button>
+            )}
           </div>
-
         </DialogContent>
       </Dialog>
     </div>

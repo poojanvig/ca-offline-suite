@@ -1,11 +1,12 @@
 {
   "name": "cyphersol-ats-electron-app",
-  "version": "1.0.8",
-  "description": "",
+  "version": "1.0.1",
+  "description": "Cyphersol ATS Electron Application",
   "main": "main.js",
+  "icon": "./assets/cyphersol-icon.png",
   "scripts": {
     "start": "electron main.js",
-    "start:fastapi": "cd ../backend && uvicorn app:app --reload --port 5000",
+    "start:fastapi": "cd ../ && uvicorn backend.main:app --reload --port 7500",
     "start:react": "cd react-app && npm start",
     "start:electron": "cross-env NODE_ENV=development wait-on http://localhost:3000 && electron main.js",
     "start-all": "cross-env NODE_ENV=development concurrently \"npm run start:fastapi\" \"npm run start:react\" \"npm run start:electron\"",
@@ -39,12 +40,13 @@
       "provider": "github",
       "owner": "Shama-Cyphersol",
       "repo": "ca-offline-suite",
-      "private": true
+      "private": true,
+      "releaseType": "release"
     },
     "files": [
       "**/*",
       "react-app/build/**/*",
-      "../backend/**/*",
+      "!../backend/**/*",
       "env/**/*",
       "!react-app/build/static/js/*.map",
       "!react-app/node_modules",
@@ -55,8 +57,8 @@
     ],
     "extraResources": [
       {
-        "from": "../backend/dist",
-        "to": "backend"
+        "from": "../dist/main",
+        "to": "backend/main"
       },
       {
         "from": "media",
@@ -89,7 +91,12 @@
       "darkModeSupport": true
     },
     "win": {
-      "target": ["nsis", "zip"],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "verifyUpdateCodeSignature": false,
       "publisherName": "Cyphersol"
@@ -103,8 +110,7 @@
       "deleteAppDataOnUninstall": true,
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "uninstallDisplayName": "${productName}",
-      "differentialPackage": true,
-      "include": "build/installer.nsh"
+      "differentialPackage": true
     },
     "linux": {
       "target": "AppImage"
@@ -118,6 +124,7 @@
     "bcrypt": "^5.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "crypto": "^1.0.1",
     "d3-scale": "^4.0.2",
     "d3-scale-chromatic": "^3.1.0",
     "dotenv": "^16.4.7",
@@ -133,6 +140,7 @@
     "python-shell": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "systeminformation": "^5.25.11",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.0.5"
