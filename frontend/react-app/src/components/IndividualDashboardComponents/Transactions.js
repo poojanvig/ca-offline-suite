@@ -1,119 +1,16 @@
 import React, { useState, useEffect } from "react";
-import SingleLineChart from "../charts/LineChart";
-import SingleBarChart from "../charts/BarChart";
-import PieCharts from "../charts/PieCharts";
-import DataTable from "./TableData";
-import { Maximize2, Minimize2 } from "lucide-react";
-import { Card, CardHeader, CardTitle } from "../ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import ToggleStrip from "./ToggleStrip";
 import { useParams } from "react-router-dom";
-import CategoryEditTable from "../MainDashboardComponents/CategoryEditTable";
+import UnifiedTable from "../IndividualDashboardComponents/UnifiedTable";
 
-const MaximizableChart = ({ children, title, isMaximized, setIsMaximized }) => {
-  const toggleMaximize = () => setIsMaximized(!isMaximized);
 
-  if (isMaximized) {
-    return (
-      <Dialog open={isMaximized} onOpenChange={setIsMaximized}>
-        <DialogContent className="max-w-[100vw] w-[70vw] max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 w-full overflow-hidden">{children}</div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  return (
-    <div className="w-full md:w-1/2 lg:w-1/3 p-2">
-      <Card className="h-full">
-        <CardHeader className="relative">
-          <CardTitle className="dark:text-slate-300">{title}</CardTitle>
-          <button
-            onClick={toggleMaximize}
-            className="absolute top-4 right-4 p-1 rounded-lg 
-                     bg-slate-100 dark:bg-slate-800 
-                     hover:bg-slate-200 dark:hover:bg-slate-700
-                     transition-colors duration-200"
-            aria-label="Maximize"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-        </CardHeader>
-        <div className="p-4">{children}</div>
-      </Card>
-    </div>
-  );
-};
 
 const Transactions = () => {
-  const [isDailyBalanceMaximized, setIsDailyBalanceMaximized] = useState(false);
-  const [isCreditDebitMaximized, setIsCreditDebitMaximized] = useState(false);
-  const [isCategoryMaximized, setIsCategoryMaximized] = useState(false);
   const [transactionData, setTransactionData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [availableMonths, setAvailableMonths] = useState([]);
   const { caseId, individualId } = useParams();
-  const [categoryOptions, setCategoryOptions] = useState(null);
-
-  // Sample entity options
-  const categoryOptionsfixed = [
-    "Bank Charges",
-    "Bank Interest Received",
-    "Bonus Paid",
-    "Bonus Received",
-    "Bounce",
-    "Cash Deposits",
-    "Cash Reversal",
-    "Cash Withdrawal",
-    "Closing Balance",
-    "Credit Card Payment",
-    "Debtor List",
-    "Departmental Stores",
-    "Donation",
-    "Food Expense/Hotel",
-    "General Insurance",
-    "Gold Loan",
-    "GST Paid",
-    "Income Tax Paid",
-    "Income Tax Refund",
-    "Indirect tax",
-    "Interest Debit",
-    "Interest Received",
-    "Investment",
-    "Life insurance",
-    "Loan",
-    "Loan given",
-    "Local Cheque Collection",
-    "Online Shopping",
-    "Opening Balance",
-    "Other Expenses",
-    "POS-Cr",
-    "POS-Dr",
-    "Probable Claim Settlement",
-    "Property Tax",
-    "Provident Fund",
-    "Redemption, Dividend & Interest",
-    "Refund/Reversal",
-    "Rent Paid",
-    "Rent Received",
-    "Salary Paid",
-    "Salary Received",
-    "Subscription / Entertainment",
-    "TDS Deducted",
-    "Total Income Tax Paid",
-    "Travelling Expense",
-    "UPI-Cr",
-    "UPI-Dr",
-    "Utility Bills",
-  ];
-
-  useEffect(() => {
-    setCategoryOptions(categoryOptionsfixed);
-  }, []);
 
   useEffect(() => {
   }, [individualId]);
@@ -130,6 +27,7 @@ const Transactions = () => {
 
         // Transform the data to only include required fields
         const formattedData = data.map((transaction) => ({
+          
           date: new Date(transaction.date).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "2-digit",
@@ -143,7 +41,6 @@ const Transactions = () => {
           bank: transaction.bank,
           id:transaction.id
         }));
-
         setTransactionData(formattedData);
       } catch (err) {
         setError("Failed to fetch transactions");
@@ -158,17 +55,26 @@ const Transactions = () => {
 
   const monthsData = React.useMemo(() => {
     return transactionData.reduce((acc, transaction) => {
-      const date = new Date(transaction.date);
+      const [day, month, year] = transaction.date.split("/").map(Number);
+      const date = new Date(year, month - 1, day); // month is zero-based in JS
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date detected:", transaction.date);
+        return acc; // Skip invalid dates
+    }
+
+
+
       const monthKey = `${date.toLocaleString("en-GB", {
         month: "short",
       })}-${date.getFullYear()}`;
+
 
       if (!acc[monthKey]) {
         acc[monthKey] = [];
       }
 
       const standardizedTransaction = {
-        date: date,
+        date: transaction.date,
         description: transaction.description,
         amount: transaction.amount,
         balance: transaction.balance,
@@ -193,11 +99,7 @@ const Transactions = () => {
 
   const processDailyData = (transactions) => {
     return transactions.map((transaction) => ({
-      date: transaction.date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
+      date: transaction.date,
       description: transaction.description,
       credit:
         transaction.type.toLowerCase() === "credit" ? transaction.amount : 0,
@@ -213,33 +115,7 @@ const Transactions = () => {
 
   // print the processed data
 
-  const processCreditDebitData = (transactions) => {
-    return transactions.map((transaction) => ({
-      date: transaction.date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
-      credit:
-        transaction.type.toLowerCase() === "credit" ? transaction.amount : 0,
-      debit:
-        transaction.type.toLowerCase() === "debit" ? transaction.amount : 0,
-    }));
-  };
-  const processCategoryData = (transactions) => {
-    const categoryTotals = transactions.reduce((acc, transaction) => {
-      if (transaction.type === "debit") {
-        const category = transaction.category || "Uncategorized";
-        if (!acc[category]) {
-          acc[category] = { name: category, value: 0 };
-        }
-        acc[category].value += Math.abs(transaction.amount);
-      }
-      return acc;
-    }, {});
-
-    return Object.values(categoryTotals);
-  };
+  
 
   const [selectedMonths, setSelectedMonths] = useState(availableMonths);
   useEffect(() => {
@@ -256,7 +132,9 @@ const Transactions = () => {
       setSelectedMonths(availableMonthstemp);
     }
 
-  }, [monthsData,]);
+  }, [monthsData]);
+
+
 
   const filteredData = selectedMonths
     .flatMap((month) => {
@@ -265,18 +143,9 @@ const Transactions = () => {
     })
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-
-  const creditVsdebit = selectedMonths
-    .flatMap((month) => {
-      const dailyData = processCreditDebitData(monthsData[month]);
-      return Object.values(dailyData);
-    })
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  const categoryData = processCategoryData(
-    selectedMonths.flatMap((month) => monthsData[month])
-  );
-
+    useEffect(() => {
+      console.log({filteredData})
+    }, [filteredData]);
   return (
     <div className="rounded-lg space-y-6 m-8 mt-2">
       {isLoading ? (
@@ -369,10 +238,9 @@ const Transactions = () => {
                 </MaximizableChart>
               </div> */}
 
-              <CategoryEditTable
+              <UnifiedTable
                 data={filteredData}
-                categoryOptions={categoryOptions}
-                setCategoryOptions={setCategoryOptions}
+                title="Transactions"
                 caseId={parseInt(caseId)}
               />
             </>

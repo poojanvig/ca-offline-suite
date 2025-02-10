@@ -1,175 +1,152 @@
 import React, { useState, useEffect } from "react";
-import HorizontalBarChart from "../charts/HorizontalBarChart";
-import SuspensePieChart from "../charts/SuspensePieChart";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import DataTable from "./TableData";
 import { useParams } from "react-router-dom";
+import { exportToExcel, shareExcelFile } from "../exportToExcel";
+import UnifiedTable from "./UnifiedTable";
+import ToggleStrip from "./ToggleStrip";
+import { RotateCw } from "lucide-react";
+import { Button } from "../ui/button";
 
 const Suspense = () => {
-  const [creditData, setCreditData] = useState([]);
-  const [debitData, setDebitData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [
-    totalCreditDebitTransactionCount,
-    setTotalCreditDebitTransactionCount,
-  ] = useState(0);
+  // const [creditData, setCreditData] = useState([]);
+  // const [debitData, setDebitData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [suspenseAllData, setSuspenseAllData] = useState([]);
+  // const [
+  //   totalCreditDebitTransactionCount,
+  //   setTotalCreditDebitTransactionCount,
+  // ] = useState(0);
   const { caseId, individualId } = useParams();
+  const [availableMonths, setAvailableMonths] = useState([]);
+  const [selectedMonths, setSelectedMonths] = useState([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch both credit and debit data
-        const creditTransactions =
-          await window.electron.getTransactionsBySuspenseCredit(
-            caseId,
-            parseInt(individualId)
-          );
-        const debitTransactions =
-          await window.electron.getTransactionsBySuspenseDebit(
-            caseId,
-            parseInt(individualId)
-          );
+  const getMonthKey = (dateString) => {
+    const date = new Date(dateString);
+    return `${date.toLocaleString("en-GB", {
+      month: "short",
+    })}-${date.getFullYear()}`;
+  };
 
-        const totalCreditDebitTransactionCount =
-          await window.electron.getTransactionsCount(caseId);
-        setTotalCreditDebitTransactionCount(totalCreditDebitTransactionCount);
-        console.log(
-          "totalCreditDebitTransactionCount",
-          totalCreditDebitTransactionCount
+  // Helper function to parse month string to Date
+  const getMonthDate = (monthStr) => {
+    const [month, year] = monthStr.split("-");
+    const monthIndex = new Date(Date.parse(month + " 1, 2000")).getMonth();
+    return new Date(parseInt(year), monthIndex);
+  };
+
+  const processData = (transactions) => {
+    return transactions.map((transaction) => ({
+      date: new Date(transaction.date).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+      description: transaction.description,
+      credit:
+        transaction.type.toLowerCase() === "credit" ? transaction.amount : 0,
+      debit:
+        transaction.type.toLowerCase() === "debit" ? transaction.amount : 0,
+      balance: transaction.balance,
+      category: transaction.category,
+      id: transaction.id,
+      monthKey: getMonthKey(transaction.date),
+    }));
+  };
+
+  const fetchData = async () => {
+    try {
+      const suspenseTransactionaAll =
+        await window.electron.getTransactionsBySuspense(
+          caseId,
+          parseInt(individualId)
         );
 
-        // Transform credit data
-        const transformedCreditData = creditTransactions.map((item) => ({
-          date: new Date(item.date).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }),
-          Description: item.description,
-          Credit: item.amount,
-        }));
+      console.log("suspenseTransactionaAll", suspenseTransactionaAll);
 
-        // Transform debit data
-        const transformedDebitData = debitTransactions.map((item) => ({
-          date: new Date(item.date).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }),
-          Description: item.description,
-          Debit: item.amount,
-        }));
+      const transformedSuspenseData = processData(suspenseTransactionaAll);
 
-        setCreditData(transformedCreditData);
-        setDebitData(transformedDebitData);
-      } catch (error) {
-        console.error("Error fetching suspense data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      console.log("transformedSuspenseData", transformedSuspenseData);
 
+      const uniqueMonths = [
+        ...new Set(transformedSuspenseData.map((item) => item.monthKey)),
+      ].sort((a, b) => {
+        const dateA = getMonthDate(a);
+        const dateB = getMonthDate(b);
+        return dateA - dateB;
+      });
+      setSuspenseAllData(transformedSuspenseData);
+      setAvailableMonths(uniqueMonths);
+
+      // Initially select all months
+      setSelectedMonths(uniqueMonths);
+    } catch (error) {
+      console.error("Error fetching suspense transactions:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
-  console.log("creditData", creditData);
-
-  // Chart configuration
-  const chartConfig = {
-    yAxis: {
-      type: "String",
-      ticks: ["Credit", "Debit"],
-    },
-    xAxis: {
-      type: "Number",
-      ticks: [0, 10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000],
-    },
-  };
+  const filteredData = suspenseAllData.filter((item) =>
+    selectedMonths.includes(item.monthKey)
+  );
 
   if (isLoading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
+        <p className="text-gray-800 text-center mt-3 font-medium text-lg">
+          Loading...
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="rounded-xl shadow-sm m-8 mt-2 bg-white space-y-6 dark:bg-slate-950">
-      <Tabs defaultValue="credit">
-        <TabsList className="grid w-[500px] grid-cols-2 pb-10">
-          <TabsTrigger value="credit">Credit</TabsTrigger>
-          <TabsTrigger value="debit">Debit</TabsTrigger>
-        </TabsList>
+    <div className="rounded-lg m-8 mt-2 space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Suspense Transactions</h2>
 
-        <TabsContent value="credit">
-          {creditData.length === 0 ? (
-            <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
-              <p className="text-gray-800 text-center mt-3 font-medium text-lg">
-                No Data Available
-              </p>
+        {/* Refresh Button */}
+        <Button onClick={fetchData} variant="outline" className="flex items-center gap-2">
+          <RotateCw className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
+          <p className="text-gray-800 text-center mt-3 font-medium text-lg">Loading...</p>
+        </div>
+      ) : suspenseAllData.length === 0 ? (
+        <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
+          <p className="text-gray-800 text-center mt-3 font-medium text-lg">No Data Available</p>
+        </div>
+      ) : (
+        <>
+          <ToggleStrip
+            columns={availableMonths}
+            selectedColumns={selectedMonths}
+            setSelectedColumns={setSelectedMonths}
+          />
+
+          {selectedMonths.length === 0 ? (
+            <div className="text-center text-gray-600 dark:text-gray-400 my-6">
+              Select months to display the graphs
             </div>
           ) : (
-            <div className="grid grid-rows-[60vh_auto] gap-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="w-full h-full">
-                  <HorizontalBarChart
-                    data={creditData}
-                    title="Suspense Credit Chart"
-                    xAxisKey="Description"
-                    yAxisKey="Credit"
-                    config={chartConfig}
-                  />
-                </div>
-                <div className="w-full h-full">
-                  <SuspensePieChart
-                    data={creditData}
-                    title="Suspense Credit Chart"
-                    totalTransactionCount={
-                      totalCreditDebitTransactionCount.credit
-                    }
-                  />
-                </div>
-              </div>
-              <div>
-                <DataTable data={creditData} title="Suspense Credit Table" />
-              </div>
-            </div>
+            <UnifiedTable
+              data={filteredData}
+              title="Suspense Transactions"
+              caseId={caseId}
+              refreshFunction={fetchData}
+              source="suspense"
+            />
           )}
-        </TabsContent>
-
-        <TabsContent value="debit">
-          {debitData.length === 0 ? (
-            <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
-              <p className="text-gray-800 text-center mt-3 font-medium text-lg">
-                No Data Available
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-rows-[60vh_auto] gap-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="w-full h-full">
-                  <HorizontalBarChart
-                    data={debitData}
-                    title="Suspense Debit Chart"
-                    xAxisKey="Description"
-                    yAxisKey="Debit"
-                    config={chartConfig}
-                  />
-                </div>
-                <div className="w-full h-full">
-                  <SuspensePieChart
-                    data={debitData}
-                    title="Suspense Debit Chart"
-                    totalTransactionCount={
-                      totalCreditDebitTransactionCount.debit
-                    }
-                  />
-                </div>
-              </div>
-              <div>
-                <DataTable data={debitData} title="Suspense Debit Table" />
-              </div>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+        </>
+      )}
     </div>
   );
 };

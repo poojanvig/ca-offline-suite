@@ -275,7 +275,7 @@ function registerEditReportHandlers() {
     ipcMain.handle('edit-category', async (event, data, caseId) => {
 
 
-        log.info('Edit Category : ', data);
+        log.info('Edit Category : ', data, 'Case ID : ', caseId);
         // const caseId = 26;
 
         let new_categories = [];
@@ -312,14 +312,12 @@ function registerEditReportHandlers() {
         const updatedTransactions = transactionsForCase.map((transaction, index) => {
 
             const { id, Date, Amount, Type, ...requiredFields } = transaction;
-            log.info(transaction.id);
             const frontendEntry = frontendData[transaction.id.toString()]; // Check if the ID exists in frontend data
 
             if (frontendEntry) {
                 log.info("Found frontend entry for ID:", frontendEntry, id);
                 const formattedDate = formatDate(Date);
                 // If present in frontend data, update the transaction
-                log.info({ transaction, frontendEntry })
                 aiyaz = index;
                 return {
                     "Value Date": formattedDate,
@@ -356,7 +354,7 @@ function registerEditReportHandlers() {
             return acc;
         }, []);
 
-        console.log({ newCategories: newCategories, newCategoriesLength: newCategories.length });
+        console.log("New categories: ", newCategories, "NewCategoriesLength: ", newCategories.length);
 
 
         try {
@@ -380,10 +378,12 @@ function registerEditReportHandlers() {
                 eod_data: eod_data
             }
 
+            log.info({serverEndpoint,payload})
+
             // use axios 
             const response = await axios.post(serverEndpoint, payload, {
                 headers: { "Content-Type": "application/json" },
-                timeout: 300000,
+                // timeout: 300000,
                 validateStatus: (status) => status === 200,
             });
 

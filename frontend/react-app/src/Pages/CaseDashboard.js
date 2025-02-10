@@ -8,7 +8,8 @@ import CombinedTable from "../components/CaseDashboardComponents/CombinedTable";
 import { useNavigate, useParams } from "react-router-dom";
 import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 import { BreadcrumbDynamic } from "../components/BreadCrumb";
-import { User, UserPen } from "lucide-react";
+import { User, UserPen,Import } from "lucide-react";
+import TallyDirectImport from "../components/ImortTally/TallyDirectImport";
 
 const CaseDashboard = () => {
   const { breadcrumbs, setCaseDashboard } = useBreadcrumb();
@@ -44,13 +45,20 @@ const CaseDashboard = () => {
       title: "Reports",
       url: "#",
       icon: User,
+      isActive: true,
+
     },
     {
       title: "Acc No and Acc Name",
       url: "#",
       icon: UserPen,
-      isActive: true,
     },
+    {
+      title: "Import to Tally",
+      url: "#",
+      icon: Import,
+    },
+    
   ];
 
   useEffect(() => {
@@ -84,8 +92,9 @@ const CaseDashboard = () => {
             {activeTab === "Acc No and Acc Name" && (
               <AccountNumNameManager caseId={caseId} />
             )}
-            {activeTab === "Reports" && <IndividualTable caseId={caseId} />}
+            {activeTab === "Reports" && <IndividualTable caseId={caseId} caseName={reportNameFromDb} />}
             {activeTab === "Combined Table" && <CombinedTable />}
+            {activeTab === "Import to Tally" && <TallyDirectImport caseId={caseId}/>}
           </main>
         </div>
       </ScrollArea>

@@ -15,8 +15,10 @@ import EMI from "../components/IndividualDashboardComponents/EMI";
 import Investment from "../components/IndividualDashboardComponents/Investment";
 import EodBalance from "../components/IndividualDashboardComponents/EodBalance";
 import Reversal from "../components/IndividualDashboardComponents/Reversal";
-import ForeignTransactions from "../components/IndividualDashboardComponents/ForeignTransactions";
+// import ForeignTransactions from "../components/IndividualDashboardComponents/ForeignTransactions";
 import Upi from "../components/IndividualDashboardComponents/Upi";
+import Insurance from "../components/IndividualDashboardComponents/Insurance";
+import Contra from "../components/IndividualDashboardComponents/Contra";
 import {
   ArrowDownWideNarrow,
   ArrowRightLeft,
@@ -29,6 +31,7 @@ import {
   MessageSquareText,
   ScanLine,
   Undo2,
+  ShieldPlus,
 } from "lucide-react";
 
 const IndividualDashboard = () => {
@@ -36,6 +39,64 @@ const IndividualDashboard = () => {
   const { breadcrumbs, setIndividualDashboard } = useBreadcrumb();
   const { caseId, individualId, defaultTab } = useParams();
   const [customerName, setCustomerName] = useState(null);
+  const [navItems, setNavItems] = useState([
+    {
+      title: "Summary",
+      icon: ClipboardList,
+      isActive: true,
+    },
+    {
+      title: "Transactions",
+      icon: ArrowRightLeft,
+    },
+    {
+      title: "Debtors",
+      url: "#",
+      icon: ArrowUpNarrowWide,
+    },
+    {
+      title: "Creditors",
+      icon: ArrowDownWideNarrow,
+    },
+    {
+      title: "UPI",
+      icon: ScanLine,
+    },
+    {
+      title: "Cash",
+      icon: IndianRupee,
+    },
+    {
+      title: "EMI",
+      icon: MessageSquareText,
+    },
+    {
+      title: "Investment",
+      url: "#",
+      icon: ChartNoAxesCombined,
+    },
+    {
+      title: "Reversal",
+      url: "#",
+      icon: Undo2,
+    },
+    {
+      title: "Suspense",
+      icon: FileQuestion,
+    },
+    {
+      title: "EOD",
+      icon: History,
+    },
+    {
+      title: "Insurance",
+      icon: ShieldPlus,
+    },
+    {
+      title: "Contra",
+      icon: IndianRupee,
+    },
+  ]);
 
   useEffect(() => {
     setIndividualDashboard(
@@ -55,6 +116,7 @@ const IndividualDashboard = () => {
 
   useEffect(() => {
     const fetchCustomerName = async () => {
+      console.log("Fetching customer name for individual ID:", individualId);
       try {
         const customerName = await window.electron.getCustomerName(
           individualId
@@ -68,66 +130,31 @@ const IndividualDashboard = () => {
       }
     };
 
-    if (individualId) {
+    if (individualId!==undefined) {
       // Only fetch if we have an ID
       fetchCustomerName();
+      // hide eod for individual
+      setNavItems((prev) => {
+        return prev.filter((item) => item.title !== "EOD");
+      });
+    }else{
+      // show eod for where individual id is not present, first check if it is already present
+      if(!navItems.find((item) => item.title === "EOD")){
+        setNavItems((prev) => {
+          return [...prev, {
+            title: "EOD",
+            icon: History,
+          }]
+        });
+      }
     }
-  }, [individualId]);
+  }, []);
 
   useEffect(() => {
     console.log({ caseId, individualId, defaultTab });
   }, []);
 
-  const navItems = [
-    {
-      title: "Summary",
-      icon: ClipboardList,
-      isActive: true,
-    },
-    {
-      title: "Transactions",
-      icon: ArrowRightLeft,
-    },
-    {
-      title: "EOD",
-      icon: History,
-    },
-    {
-      title: "Suspense",
-      icon: FileQuestion,
-    },
-    {
-      title: "Cash",
-      icon: IndianRupee,
-    },
-    {
-      title: "UPI",
-      icon: ScanLine,
-    },
-    {
-      title: "Debtors",
-      url: "#",
-      icon: ArrowUpNarrowWide,
-    },
-    {
-      title: "Creditors",
-      icon: ArrowDownWideNarrow,
-    },
-    {
-      title: "EMI",
-      icon: MessageSquareText,
-    },
-    {
-      title: "Investment",
-      url: "#",
-      icon: ChartNoAxesCombined,
-    },
-    {
-      title: "Reversal",
-      url: "#",
-      icon: Undo2,
-    },
-  ];
+
 
   useEffect(() => {
     if (defaultTab === "defaultTab") setActiveTab(navItems[0].title);
@@ -188,7 +215,12 @@ const IndividualDashboard = () => {
               {activeTab === "Reversal" && (
                 <Reversal caseId={caseId} individualId={individualId} />
               )}
-              {/* {activeTab === "Reversal" && <ForeignTransactions />} */}
+              {activeTab === "Insurance" && (
+                <Insurance caseId={caseId} individualId={individualId} />
+              )}
+              {activeTab === "Contra" && (
+                <Contra caseId={caseId} individualId={individualId} />
+              )}
             </main>
           </div>
         </ScrollArea>

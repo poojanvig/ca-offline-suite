@@ -1,39 +1,40 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import BarLineChart from "../charts/BarLineChart";
 import UnifiedTable from "./UnifiedTable";
 import ToggleStrip from "./ToggleStrip";
 import { useParams } from "react-router-dom";
-// import CreditorData from "../../data/Creditors.json";
+// import investementData from "../../data/investment.json";
 
-const Creditors = () => {
+const Insurance = () => {
   const [data, setData] = useState([]);
+  const [insuranceSummary, setInsuranceSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const { caseId, individualId } = useParams();
-  const [availableMonths, setAvailableMonths] = useState([]);
-  const [selectedMonths, setSelectedMonths] = useState([]);
+    const [availableMonths, setAvailableMonths] = useState([]);
+    const [selectedMonths, setSelectedMonths] = useState([]);
+      // Helper function to get month key
+      const getMonthKey = (dateString) => {
+        const date = new Date(dateString);
+        return `${date.toLocaleString("en-GB", { month: "short" })}-${date.getFullYear()}`;
+      };
+    
+      // Helper function to parse month string to Date
+      const getMonthDate = (monthStr) => {
+        const [month, year] = monthStr.split("-");
+        const monthIndex = new Date(Date.parse(month + " 1, 2000")).getMonth();
+        return new Date(parseInt(year), monthIndex);
+      };
 
-    // Helper function to get month key
-    const getMonthKey = (dateString) => {
-      const date = new Date(dateString);
-      return `${date.toLocaleString("en-GB", { month: "short" })}-${date.getFullYear()}`;
-    };
-  
-    // Helper function to parse month string to Date
-    const getMonthDate = (monthStr) => {
-      const [month, year] = monthStr.split("-");
-      const monthIndex = new Date(Date.parse(month + " 1, 2000")).getMonth();
-      return new Date(parseInt(year), monthIndex);
-    };
-  
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         // Fetch transactions filtered by "debtor"
-        const result = await window.electron.getTransactionsByCreditor(
+        const result = await window.electron.getTransactionsByInsurance(
           caseId,
           parseInt(individualId)
         );
-        // console.log("Debtors' transactions:", result);
+        console.log("Insurance transactions:", result);
         // Transform data to include only required fields
         const transformedData = result.map((item) => ({
           date: new Date(item.date).toLocaleDateString("en-GB", {
@@ -45,12 +46,10 @@ const Creditors = () => {
           debit: item.amount,
           balance: item.balance,
           category: item.category,
-          entity:item.entity|| '-',
-          id:item.id,
           monthKey: getMonthKey(item.date)
-
         }));
-
+        const groupedInsurance = processInsuranceSummary(transformedData);
+        setInsuranceSummary(groupedInsurance);
         const uniqueMonths = [...new Set(transformedData.map(item => item.monthKey))]
           .sort((a, b) => {
             const dateA = getMonthDate(a);
@@ -63,17 +62,48 @@ const Creditors = () => {
         // Initially select all months
         setSelectedMonths(uniqueMonths);
       } catch (error) {
-        console.error("Error fetching debtors' transactions:", error);
+        console.error("Error fetching insurance transactions:", error);
       } finally {
         setLoading(false);
       }
     };
-  useEffect(() => {
-  
 
     fetchData();
   }, []);
 
+  const processInsuranceSummary = (transactions) => {
+    const grouped = [];
+    const threshold = 0.7;
+  
+    transactions.forEach((transaction) => {
+      const existing = grouped.find(
+        (item) =>
+          item.amount === transaction.debit &&
+          similarity(item.description, transaction.description) >= threshold
+      );
+  
+      if (existing) {
+        existing.frequency++;
+      } else {
+        grouped.push({
+          description: transaction.description,
+          amount: transaction.debit,
+          frequency: 1,
+        });
+      }
+    });
+  
+    // Return grouped without filtering, as unique entries should have frequency 1
+    return grouped;
+  };
+  
+
+  const similarity = (str1, str2) => {
+    const s1 = str1.toLowerCase();
+    const s2 = str2.toLowerCase();
+    const match = [...s1].filter((char) => s2.includes(char)).length;
+    return match / Math.max(s1.length, s2.length);
+  };
   const filteredData = data.filter(item => 
     selectedMonths.includes(item.monthKey)
   );
@@ -90,7 +120,6 @@ const Creditors = () => {
 
   return (
     <div className="rounded-lg m-8 mt-2 space-y-6">
-      
       {data.length === 0 ? (
         <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
           <p className="text-gray-800 text-center mt-3 font-medium text-lg">
@@ -113,17 +142,17 @@ const Creditors = () => {
           <>
             <div className="w-full h-[60vh]">
               <BarLineChart
-                xAxisKey="date"
-                yAxisKey="balance"
-                data={filteredData}
-                title="Creditors"
+              data={filteredData}
+              title="Insurance"
+              xAxisKey={"date"}
+              yAxisKey={"debit"}
               />
             </div>
-            <div className="w-full">
-  
-            <UnifiedTable data={filteredData} title="Creditors Transactions"
-                    caseId={caseId} refreshFunction={fetchData}
-                    />
+            <div>
+            <UnifiedTable data={insuranceSummary} title="Insurance Summary" />
+          </div>
+            <div>
+              <UnifiedTable data={filteredData} title="Insurance Transactions" />
             </div>
           </>
         )}
@@ -133,4 +162,4 @@ const Creditors = () => {
   );
 };
 
-export default Creditors;
+export default Insurance;
