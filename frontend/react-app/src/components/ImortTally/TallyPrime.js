@@ -3,24 +3,42 @@ import { AiFillFileExcel } from "react-icons/ai"; // Install react-icons using n
 
 function ExcelViewer() {
   const handleOpenFile = async (filePath) => {
-    console.log('filePath', filePath);
+    console.log("filePath", filePath);
     try {
       const response = await window.electron.openFile(filePath);
       if (response.error) {
         throw new Error(response.error); // If there's an error, throw it
       }
-      console.log('File opened successfully:', response);
+      console.log("File opened successfully:", response);
     } catch (error) {
       console.error(error);
     }
   };
 
   const files = [
-    { label: "Ledgers Voucher", path: "tallyprime/LedgersVoucher.xlsm" },
-    { label: "Payment & Receipt Voucher", path: "tallyprime/PaymentReceiptVoucher.xlsm" },
-    { label: "Purchase Multi-Stock Items Voucher", path: "tallyprime/PurchaseMultiStockItemsVoucher.xlsm" },
-    { label: "Sales Voucher", path: "tallyprime/SalesVoucher.xlsm" },
-    { label: "Stock Items Voucher", path: "tallyprime/StockItemVoucher.xlsm" },
+    { label: "Ledgers ERP", path: "tallyprime/ledger_erp.xlsm" },
+    {
+      label: "Ledgers Prime",
+      path: "tallyprime/ledger_prime.xlsm",
+    },
+    {
+      label: "Payment Voucher",
+      path: "tallyprime/payment.xlsm",
+    },
+    {
+      label: "Receipt Voucher",
+      path: "tallyprime/receipt.xlsm",
+    },
+    { label: "Purchase Voucher", path: "tallyprime/purchase.xlsm" },
+    {
+      label: "Purchase Multistock items voucher",
+      path: "tallyprime/purchase_multistock.xlsm",
+    },
+    { label: "Sales Voucher", path: "tallyprime/sales.xlsm" },
+    {
+      label: "Sales Multistock Items Voucher",
+      path: "tallyprime/sales_multistock.xlsm",
+    },
   ];
 
   return (
@@ -40,9 +58,7 @@ function ExcelViewer() {
           fontSize: "2.5rem",
           fontWeight: "700",
         }}
-      >
-
-      </h1>
+      ></h1>
       <div
         style={{
           display: "grid",
@@ -69,11 +85,13 @@ function ExcelViewer() {
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = "translateY(-5px)";
-              e.currentTarget.style.boxShadow = "0px 8px 16px rgba(0, 0, 0, 0.15)";
+              e.currentTarget.style.boxShadow =
+                "0px 8px 16px rgba(0, 0, 0, 0.15)";
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0px 4px 8px rgba(0, 0, 0, 0.1)";
+              e.currentTarget.style.boxShadow =
+                "0px 4px 8px rgba(0, 0, 0, 0.1)";
             }}
           >
             <AiFillFileExcel size={60} color="#22C55E" />

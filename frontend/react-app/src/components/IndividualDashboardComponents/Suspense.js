@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import DataTable from "./TableData";
-import { useParams } from "react-router-dom";
-import { exportToExcel, shareExcelFile } from "../exportToExcel";
 import UnifiedTable from "./UnifiedTable";
 import ToggleStrip from "./ToggleStrip";
 import { RotateCw } from "lucide-react";
 import { Button } from "../ui/button";
+import { useParams } from "react-router-dom";
+
 
 const Suspense = () => {
   // const [creditData, setCreditData] = useState([]);
@@ -16,9 +15,10 @@ const Suspense = () => {
   //   totalCreditDebitTransactionCount,
   //   setTotalCreditDebitTransactionCount,
   // ] = useState(0);
-  const { caseId, individualId } = useParams();
   const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedMonths, setSelectedMonths] = useState([]);
+  const { caseId, individualId, defaultTab } = useParams();
+
 
   const getMonthKey = (dateString) => {
     const date = new Date(dateString);
@@ -107,10 +107,16 @@ const Suspense = () => {
   return (
     <div className="rounded-lg m-8 mt-2 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Suspense Transactions</h2>
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+          Suspense Transactions
+        </h2>
 
         {/* Refresh Button */}
-        <Button onClick={fetchData} variant="outline" className="flex items-center gap-2">
+        <Button
+          onClick={fetchData}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
           <RotateCw className="w-4 h-4" />
           Refresh
         </Button>
@@ -118,11 +124,15 @@ const Suspense = () => {
 
       {isLoading ? (
         <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
-          <p className="text-gray-800 text-center mt-3 font-medium text-lg">Loading...</p>
+          <p className="text-gray-800 text-center mt-3 font-medium text-lg">
+            Loading...
+          </p>
         </div>
       ) : suspenseAllData.length === 0 ? (
         <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
-          <p className="text-gray-800 text-center mt-3 font-medium text-lg">No Data Available</p>
+          <p className="text-gray-800 text-center mt-3 font-medium text-lg">
+            No Data Available
+          </p>
         </div>
       ) : (
         <>
@@ -134,13 +144,12 @@ const Suspense = () => {
 
           {selectedMonths.length === 0 ? (
             <div className="text-center text-gray-600 dark:text-gray-400 my-6">
-              Select months to display the graphs
+              Select months to view data
             </div>
           ) : (
             <UnifiedTable
               data={filteredData}
               title="Suspense Transactions"
-              caseId={caseId}
               refreshFunction={fetchData}
               source="suspense"
             />

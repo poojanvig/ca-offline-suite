@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Turtle } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -33,7 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 //   PaginationPrevious,
 // } from "../ui/pagination";
 import { Label } from "../ui/label";
-import DataTable from "./TableData";
+import DataTable from "./UnifiedTable";
 import { Spinner } from "../ui/spinner";
 
 const SummaryTable = ({ data = [], source, title, subtitle }) => {
@@ -51,7 +51,6 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
   const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   // const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [showAllRows, setShowAllRows] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [transactionData, setTransactionData] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -71,6 +70,7 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
 
   useEffect(() => {
     const fetchTransactions = async () => {
+      setIsLoading(true);
       try {
         // console.log("Fetching transactions for statementId:", caseId);
         const data = await window.electron.getTransactions(
@@ -92,31 +92,53 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
 
   const filterTransactionsByCategory = (row) => {
     if (!row || !transactionData.length) {
-      console.log("No row or transaction data:", {
-        row,
-        transactionLength: transactionData.length,
-      });
       return [];
     }
 
     // Get the category value from the summary row
-    const categoryColumn = Object.keys(row)[0]; // "Income / Receipts"
-    const categoryValue = row[categoryColumn]; // "Cash Deposits"
+    const categoryColumn = Object.keys(row)[0];
+    console.log("Category column:", categoryColumn);
+    const categoryValue = row[categoryColumn];
+    console.log("Category value:", categoryValue);
 
     return transactionData
-      .filter((transaction) => transaction.category === categoryValue)
+      .filter((transaction) =>
+        (transaction.category === categoryValue &&
+          categoryColumn === "Contra Debit" &&
+          transaction.type == "credit") ||
+        (categoryColumn === "Contra Credit" && transaction.type == "debit")
+          ? transaction.description
+              .toLowerCase()
+              .includes(categoryValue.toLowerCase())
+          : transaction.category
+              .toLowerCase()
+              .includes(categoryValue.toLowerCase())
+      )
       .map((transaction) => {
-        const { id, statementId, type, ...rest } = transaction;
+        console.log({ transaction });
+        // Create a formatted date string from the date object
+        let formattedDate;
+        try {
+          if (transaction.date instanceof Date) {
+            formattedDate = transaction.date.toLocaleDateString("en-GB");
+          } else if (typeof transaction.date === "string") {
+            // If it's already a string date, try to parse and format it
+            const dateObj = new Date(transaction.date);
+            formattedDate = dateObj.toLocaleDateString("en-GB");
+          }
+        } catch (error) {
+          console.error("Error formatting date:", error);
+        }
+
+        // Return a new object with all fields, including the formatted date
         return {
-          ...rest,
-          date:
-            transaction.date instanceof Date
-              ? transaction.date.toLocaleDateString("en-GB", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })
-              : transaction.date,
+          date: formattedDate,
+          description: transaction.description,
+          amount: transaction.amount,
+          category: transaction.category,
+          balance: transaction.balance,
+          bank: transaction.bank,
+          entity: transaction.entity,
         };
       });
   };
@@ -141,8 +163,10 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
   }, [data]);
 
   const handleRowClick = (row) => {
+    console.log({ clicked: row });
     setSelectedRow(row);
     const filtered = filterTransactionsByCategory(row);
+
     // console.log("Filtered transactions:", filtered);
     setFilteredTransactions(filtered);
   };
@@ -336,13 +360,35 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
         </div>
       </CardHeader>
       <CardContent>
-        {columns.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-[200px]">
+            <Spinner />
+          </div>
+        ) : data.length === 0 ? (
+          <div className="relative overflow-x-auto">
+            <Table>
+              {/* <TableHeader>
+          <TableRow>
+            <TableHead className="text-center">No Data Available</TableHead>
+          </TableRow>
+        </TableHeader> */}
+              <TableBody>
+                <TableRow>
+                  <TableCell className="text-center">
+                    No data available
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          // Render the table as before when there is data
           <div className="relative overflow-x-auto">
             <div className="flex">
               {/* Fixed First Column */}
               <div className="sticky left-0 z-20 min-w-[300px] bg-white dark:bg-slate-950">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="border-r-2 border-slate-300">
                     <TableRow>
                       <TableHead className="bg-gray-300 dark:bg-slate-800 text-black opacity-80 whitespace-nowrap">
                         <div className="flex items-center gap-2">
@@ -376,7 +422,7 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
                             : () => handleRowClick(row)
                         }
                       >
-                        <TableCell className="max-w-[200px] whitespace-nowrap">
+                        <TableCell className="max-w-[200px] whitespace-nowrap border-r-2 border-slate-300">
                           {row[columns[0]]}
                         </TableCell>
                       </TableRow>
@@ -456,7 +502,7 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
               {/* Fixed Last Column */}
               <div className="sticky right-0 z-20 bg-white dark:bg-slate-950">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="border-l-2 border-slate-300">
                     <TableRow>
                       <TableHead className="bg-gray-300 dark:bg-slate-800 text-black opacity-80 whitespace-nowrap">
                         <div className="flex items-center gap-2">
@@ -490,7 +536,7 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
                             : () => handleRowClick(row)
                         }
                       >
-                        <TableCell className="max-w-[200px] whitespace-nowrap">
+                        <TableCell className="max-w-[200px] whitespace-nowrap border-l-2 border-slate-300">
                           {row[columns[columns.length - 1]]}
                         </TableCell>
                       </TableRow>
@@ -500,46 +546,7 @@ const SummaryTable = ({ data = [], source, title, subtitle }) => {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="flex items-center justify-center h-[200px]">
-            <Spinner />
-          </div>
         )}
-
-        {/* {showPagination  && totalPages > 1 && (
-          <div className="mt-4 flex justify-center">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                  />
-                </PaginationItem>
-                {getPageNumbers().map((pageNum, index) => (
-                  <PaginationItem key={index}>
-                    {pageNum === "ellipsis" ? (
-                      <PaginationEllipsis />
-                    ) : (
-                      <PaginationLink
-                        onClick={() => setCurrentPage(pageNum)}
-                        isActive={currentPage === pageNum}
-                      >
-                        {pageNum}
-                      </PaginationLink>
-                    )}
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-            )} */}
       </CardContent>
 
       {/* Category Filter Modal - Apple Style */}

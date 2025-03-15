@@ -27,7 +27,7 @@ const SingleBarChart = ({
   showLegends = false,
 }) => {
   // Get all columns from the first data item
-  const [columnsToIgnore, setColumnsToIgnore] = useState(["balance"]);
+  const [columnsToIgnore, setColumnsToIgnore] = useState(["balance","id"]);
 
   let columns = data.length > 0 ? Object.keys(data[0]) : [];
   columns = columns.filter((column) => !columnsToIgnore.includes(column));
@@ -72,7 +72,7 @@ const SingleBarChart = ({
       </CardHeader>
       <CardContent className="h-[calc(100%-4rem)]">
         <ChartContainer className="w-full h-full" config={config}>
-          <ResponsiveContainer width="100%" height="100%">
+          {/* <ResponsiveContainer width="100%" height="100%"> */}
             <BarChart
               data={data}
               margin={{
@@ -105,7 +105,7 @@ const SingleBarChart = ({
                 />
               ))}
             </BarChart>
-          </ResponsiveContainer>
+          {/* </ResponsiveContainer> */}
         </ChartContainer>
       </CardContent>
     </Card>

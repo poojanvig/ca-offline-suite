@@ -4,8 +4,10 @@ import { Card, CardHeader, CardTitle } from "../ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Maximize2, Minimize2 } from "lucide-react";
 import SummaryTable from "./SummaryTable";
-import DataTable from "./TableData";
+import DataTable from "./UnifiedTable";
 import { useParams } from "react-router-dom";
+import { useReportContext } from "../../contexts/ReportContext";
+
 
 const formatDecimal = (value) => {
   return Number(parseFloat(value || 0).toFixed(2));
@@ -48,13 +50,17 @@ const MaximizableChart = ({ children, title, isMaximized, setIsMaximized }) => {
   );
 };
 
-const Summary = ({ caseId }) => {
+const Summary = () => {
+const { reportData, updateReportData } = useReportContext();
+
   // const [activeTable, setActiveTable] = useState("Income Receipts");
   const [summaryData, setSummaryData] = useState({
     Particulars: [],
     "Income Receipts": [],
     "Important Expenses": [],
     "Other Expenses": [],
+    "Contra Debit": [],
+    "Contra Credit": [],
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -63,6 +69,8 @@ const Summary = ({ caseId }) => {
     "Income Receipts": incomeReceipts,
     "Important Expenses": importantExpenses,
     "Other Expenses": otherExpenses,
+    "Contra Debit": contraDebit,
+    "Contra Credit": contraCredit,
   } = summaryData;
 
   const [incomeMaximized, setIncomeMaximized] = useState(false);
@@ -72,7 +80,7 @@ const Summary = ({ caseId }) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [transactionData, setTransactionData] = useState([]);
-  const {individualId } = useParams();
+  const {individualId,caseId } = useParams();
 
   useEffect(() => {
     const fetchSummaryData = async () => {
@@ -80,14 +88,32 @@ const Summary = ({ caseId }) => {
 
       try {
         // console.log("Fetching summary data for caseId:", caseId);
-        const result = await window.electron.getSummary(caseId);
-        const parsedData = result.length > 0 ? JSON.parse(result[0].data) : {};
+        let result = null;
+        let parsedData = {};
+        let tempTransactions = [];
+        let isCombinedDashboard = individualId===undefined || individualId==="undefined" || individualId===null || individualId==="combined";
 
-        const transactions = await window.electron.getTransactions(
-          caseId,
-          parseInt(individualId)
-        );
-        // console.log("transactions", transactions.length);
+        if(isCombinedDashboard){
+          result = await window.electron.getSummary(caseId,null);
+          console.log("result", result);
+          parsedData = result.length > 0 ? JSON.parse(result[0].data) : {};
+          console.log("parsedData", parsedData);
+          tempTransactions = await window.electron.getTransactions(
+            caseId,
+            null
+          );
+        }else{
+          result = await window.electron.getSummary(caseId,individualId);
+          console.log("result", result);
+          parsedData = result.length > 0 ? JSON.parse(result[0].data) : {};
+          console.log("parsedData", parsedData);
+          tempTransactions = await window.electron.getTransactions(
+            caseId,
+            parseInt(individualId)
+          );
+        }
+      
+        console.log("transactions", tempTransactions.length);
 
         const formatData = (data) => {
           return data.map((item) => {
@@ -100,14 +126,29 @@ const Summary = ({ caseId }) => {
             return formattedItem;
           });
         };
+        
+        if(isCombinedDashboard ){
+         
+          setSummaryData({
+            Particulars: formatData(parsedData.particulars || []),
+            "Income Receipts": formatData(parsedData.incomeReceipts || []),
+            "Important Expenses": formatData(parsedData.importantExpenses || []),
+            "Other Expenses": formatData(parsedData.otherExpenses || []),
+            "Contra Debit": formatData(parsedData.contraDebit || []),
+            "Contra Credit": formatData(parsedData.contraCredit || []),
+          });
+        }else{
+          setSummaryData({
+            Particulars: formatData(parsedData.Particulars || []),
+            "Income Receipts": formatData(parsedData["Income Receipts"] || []),
+            "Important Expenses": formatData(parsedData["Important Expenses"] || []),
+            "Other Expenses": formatData(parsedData["Other Expenses"] || []),
+            "Contra Debit": formatData(parsedData["Contra Debit"] || []), 
+            "Contra Credit": formatData(parsedData["Contra Credit"] || []), 
+          });
+      }
 
-        setSummaryData({
-          Particulars: formatData(parsedData.particulars || []),
-          "Income Receipts": formatData(parsedData.incomeReceipts || []),
-          "Important Expenses": formatData(parsedData.importantExpenses || []),
-          "Other Expenses": formatData(parsedData.otherExpenses || []),
-        });
-        setTransactionData(transactions);
+        setTransactionData(tempTransactions);
       } catch (error) {
         console.error("Error fetching summary data:", error);
         setError(error);
@@ -116,6 +157,8 @@ const Summary = ({ caseId }) => {
           "Income Receipts": [],
           "Important Expenses": [],
           "Other Expenses": [],
+          "Contra Credit":[],
+          "Contra Debit":[]
         });
         setTransactionData([]);
       } finally {
@@ -144,7 +187,7 @@ const Summary = ({ caseId }) => {
   const [selectedMonths, setSelectedMonths] = useState([]);
   const months = useMemo(() => {
     const allMonths = new Set();
-    [particulars, incomeReceipts, importantExpenses, otherExpenses].forEach(
+    [particulars, incomeReceipts, importantExpenses, otherExpenses,contraDebit,contraCredit].forEach(
       (category) => {
         category.forEach((item) => {
           Object.keys(item).forEach((key) => {
@@ -167,7 +210,7 @@ const Summary = ({ caseId }) => {
     return Array.from(allMonths).sort(
       (a, b) => monthOrder.indexOf(a) - monthOrder.indexOf(b)
     );
-  }, [incomeReceipts, importantExpenses, otherExpenses]);
+  }, [incomeReceipts, importantExpenses, otherExpenses,particulars,contraCredit,contraDebit]);
 
   useEffect(() => {
     if (months.length > 0) {
@@ -228,7 +271,6 @@ const Summary = ({ caseId }) => {
 
   const handlePieClick = (data) => {
     const categoryName = data.name.trim().toLowerCase();
-    
     const matchingTransactions = transactionData.filter(transaction => {
       if (!transaction || !transaction.category) return false;
       const transactionCategory = transaction.category.trim().toLowerCase();
@@ -320,10 +362,10 @@ const Summary = ({ caseId }) => {
       <div className="flex flex-wrap -mx-2">
         {renderChart(
           incomeData,
-          "Income Receipts",
+          "Income / Receipts",
           incomeMaximized,
           setIncomeMaximized,
-          "Income Receipts"
+          "Income / Receipts"
         )}
         {renderChart(
           importantExpensesData,
@@ -392,6 +434,17 @@ const Summary = ({ caseId }) => {
           title="Other Expenses"
           categoryKey="Other Expenses / Payments"
         />
+          <SummaryTable
+          data={contraCredit}
+          title="Contra Credit"
+          categoryKey="Contra Credit"
+        />
+          <SummaryTable
+          data={contraDebit}
+          title="Contra Debit"
+          categoryKey="Contra Debit"
+        />
+        
       </div>
     </div>
   );

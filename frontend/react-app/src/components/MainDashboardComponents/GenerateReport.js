@@ -12,6 +12,9 @@ import {
 } from "../ui/dialog"; // Import shadcn/ui Dialog components
 import { Button } from "../ui/button"; // Import shadcn/ui Button component
 import { useNavigate } from "react-router-dom"; // Import useNavigate for navigation
+import { Card } from "../ui/card";
+import { AlertCircle, ChevronRight } from "lucide-react";
+import { useReportContext } from "../../contexts/ReportContext";
 
 export default function GenerateReport() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -24,6 +27,8 @@ export default function GenerateReport() {
   const [currentCaseName, setCurrentCaseName] = useState(""); // State to store current case name
   const navigate = useNavigate(); // Hook for navigation
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { reportData, updateReportData } = useReportContext();
+  const [missingMonthsList, setMissingMonthsList] = useState([]);
 
   const handleSubmit = async (
     setProgress,
@@ -75,6 +80,25 @@ export default function GenerateReport() {
     });
     setToastId(newToastId);
 
+    const newData = {
+      id: null,
+      name: caseName,
+      userId: null,
+      status: "Pending",
+      pages: null,
+      createdAt: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+      statements: null,
+    };
+
+    // const updatedRecentReportData = reportData.recentReportsData(newData);
+    updateReportData({
+      recentReportsData: [newData, ...reportData.recentReportsData],
+    });
+
     progressIntervalRef.current = simulateProgress();
 
     try {
@@ -113,6 +137,14 @@ export default function GenerateReport() {
         "generate-report"
       );
 
+      // console.log("months", result.data.missingMonthsList);
+      if (
+        result.data.missingMonthsList &&
+        result.data.missingMonthsList.length > 0
+      ) {
+        setMissingMonthsList(result.data.missingMonthsList);
+      }
+
       console.log("Report generation result:", result.data);
       setCurrentCaseId(result.data.caseId); // Store caseId
 
@@ -122,25 +154,73 @@ export default function GenerateReport() {
         toast.dismiss(newToastId);
         toast({
           title: "Success",
-          description: "Report generated successfully!",
+          description: `${caseName} Report generated successfully!`,
           duration: 3000,
           variant: "success",
         });
         if (result.data.failedFiles.length > 0) {
-          // setShowRectifyButton(true);
+          setShowRectifyButton(true);
           const failedFiles = result.data.failedFiles.map((file_path) => {
-            return file_path.split("\\").pop();
+            // Get the filename from the path and remove the timestamp
+            const filename = file_path.split("\\").pop(); // Get filename from path
+            const filenameWithoutTimestamp = filename.substring(
+              filename.indexOf("-") + 1
+            ); // Remove everything before first hyphen
+            return filenameWithoutTimestamp;
           });
           setFailedStatements(failedFiles || []); // Store failed
+
+          const newData = {
+            id: result.data.caseId,
+            name: caseName,
+            userId: null,
+            status: "Failed",
+            pages: null,
+            createdAt: new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }),
+            statements: null,
+          };
+
+          updateReportData({
+            recentReportsData: [newData, ...reportData.recentReportsData],
+          });
         }
+
         if (result.data.successfulFiles.length > 0) {
           // setShowRectifyButton(true);
           const successfulFiles = result.data.successfulFiles.map(
             (file_path) => {
-              return file_path.split("\\").pop();
+              // Get the filename from the path and remove the timestamp
+              const filename = file_path.split("\\").pop(); // Get filename from path
+              const filenameWithoutTimestamp = filename.substring(
+                filename.indexOf("-") + 1
+              ); // Remove everything before first hyphen
+              return filenameWithoutTimestamp;
             }
           );
-          setSuccessfulStatements(successfulFiles || []); // Store failed
+          setSuccessfulStatements(successfulFiles || []); // Store successful
+
+          const newData = {
+            id: result.data.caseId,
+            name: caseName,
+            userId: null,
+            status: "Success",
+            pages: null,
+            createdAt: new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }),
+            // statements: null,
+          };
+          console.log("maxxx", newData);
+  
+          updateReportData({
+            recentReportsData: [newData, ...reportData.recentReportsData],
+          });
         }
 
         if (result.data.totalTransactions) setShowAnalysisButton(true);
@@ -153,7 +233,7 @@ export default function GenerateReport() {
         setFileDetails([]);
 
         // Trigger a page refresh
-        refreshPage();
+        // refreshPage();
       } else {
         const errorMessage = result.error
           ? typeof result.error === "object"
@@ -190,20 +270,30 @@ export default function GenerateReport() {
         variant: "destructive",
         duration: 5000,
       });
-      refreshPage();
+      // refreshPage();
+      const updatedRecentReportData = reportData.recentReportsData;
+      updateReportData({ recentReportsData: updatedRecentReportData });
     } finally {
       setLoading(false);
-      refreshPage();
+      localStorage.removeItem("dashboardData");
+      // refreshPage();
       progressIntervalRef.current = null;
     }
   };
+
+  console.log("reportData shubham", reportData);
   const viewAnalysis = () => {
     console.log("View Analysis clicked - ", currentCaseId);
-    navigate(`/case-dashboard/${currentCaseId}/defaultTab`);
+    navigate(`/individual-dashboard/${currentCaseId}/defaultTab`);
   };
 
   const handleRectify = () => {
     setDialogOpen(false);
+
+    updateReportData({
+      ...reportData,
+      triggerRectify: { caseId: currentCaseId, caseName: currentCaseName },
+    });
     console.log("Rectify clicked ", currentCaseId, currentCaseName);
   };
 
@@ -221,6 +311,18 @@ export default function GenerateReport() {
   // const handleTestEdit = () => {
   //   window.electron.excelFileDownload(5);
   // };
+
+  const note = {
+    content: [
+      "Scanned copies",
+      "Image-Based PDF Statements: Bank statements provided as image-based PDFs, rather than in a structured file format, might lead to processing issues.",
+      "File Integrity: Encoded, encrypted, or corrupted files cannot be processed and should not be uploaded.",
+      "Handwritten Statements: Handwritten bank statements are not accepted.",
+      "Canara Bank Formats: Certain formats of Canara Bank statements may not be compatible with our processing system.",
+      "Data Authenticity: Please ensure that the uploaded data has not been tampered with, as alterations can result in incorrect responses.",
+      "Statement Recency: Avoid uploading very old bank statements, as changes in keyword formats over time may affect processing accuracy.",
+    ],
+  };
 
   return (
     <div className="p-8 pt-0 space-y-8 bg-white dark:bg-black min-h-screen">
@@ -270,12 +372,38 @@ export default function GenerateReport() {
 
       <RecentReports key={refreshTrigger} onReportGenerated={refreshPage} />
 
+      {/* statments which we dont work with */}
+      <Card className="p-6">
+        <h4 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+          <AlertCircle className="h-5 w-5 text-amber-500" />
+          Important Notes
+        </h4>
+        <h6 className="text-gray-600 dark:text-slate-300 mb-4">
+          Certain statements may not be processed properly due to various
+          reasons. Below is a list of common unsupported or partially extracted
+          formats:
+        </h6>
+        <ul className="space-y-3">
+          {note.content.map((item, idx) => (
+            <li
+              key={idx}
+              className="flex gap-3 items-center text-gray-600 dark:text-slate-300"
+            >
+              <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-400" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
       {/* Dialog for successful report generation */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
             {failedStatements.length === 0 ? (
-              <DialogTitle>Report Generated Successfully!</DialogTitle>
+              <DialogTitle>
+                Report {currentCaseName} Generated Successfully!
+              </DialogTitle>
             ) : (
               <DialogTitle className="flex items-end gap-x-2">
                 <AlertTriangle className="text-yellow-500 w-6 h-6 mt-2" />
@@ -295,16 +423,47 @@ export default function GenerateReport() {
               )} */}
             </DialogDescription>
           </DialogHeader>
+
           {(failedStatements.length > 0 || successfulStatements.length > 0) && (
-            <div className="mb-4">
+            <div className="mb-2">
               <ul className="list-disc pl-5">
                 {failedStatements.map((statement, index) => (
-                  <li key={index} className="text-red-400">{statement}</li>
+                  <li key={index} className="text-red-400">
+                    {statement}
+                  </li>
                 ))}
                 {successfulStatements.map((statement, index) => (
-                  <li key={index} className="text-green-700">{statement}</li>
+                  <li key={index} className="text-green-700">
+                    {statement}
+                  </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {/* Display Missing Months Section */}
+          {missingMonthsList.length > 0 && (
+            <div className="mb-4 mt-2">
+              <h3 className="text-md font-semibold flex items-center gap-x-2 mb-2">
+                <AlertCircle className="text-amber-500 w-5 h-5" />
+                Missing Months
+              </h3>
+              <Card className="p-3 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+                <ul className="space-y-1">
+                  {missingMonthsList.map((month, index) => (
+                    <li
+                      key={index}
+                      className="text-amber-700 dark:text-amber-400 flex items-center"
+                    >
+                      <ChevronRight className="w-4 h-4 mr-1 flex-shrink-0" />
+                      <span>{month}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-3">
+                  These months are missing from your statements. You may want to
+                  add them for a complete analysis.
+                </p>
+              </Card>
             </div>
           )}
           <div className="flex gap-4">

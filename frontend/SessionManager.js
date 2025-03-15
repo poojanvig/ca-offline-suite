@@ -79,8 +79,12 @@ class SessionManager extends EventEmitter {
     }
 
     getUser() {
-        log.info("GetUser : ", this._user);
-        return this._user;
+        return this._user || null;
+    }
+
+    getUserId() {
+        const user = this.getUser();
+        return user ? user.id : 1;
     }
 
     isAuthenticated() {
@@ -95,8 +99,15 @@ class SessionManager extends EventEmitter {
 
     clearUser() {
         this._user = null;
-        this.store.delete('user');
-        return { success: true };
+        try {
+            this.store.delete('user');
+            log.info("User deleted");
+            return { success: true };
+        }
+        catch (err) {
+            log.error("Error deleting user:", err);
+            return { success: false };
+        }
     }
 
     updateUser(userData) {

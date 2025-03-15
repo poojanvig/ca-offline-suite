@@ -30,17 +30,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "../ui/pagination";
 
-const AccountNumNameManager = ({ caseId }) => {
+import { useReportContext } from "../../contexts/ReportContext";
+
+
+const AccountNumNameManager = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [statements, setStatements] = useState([]);
@@ -49,6 +43,9 @@ const AccountNumNameManager = ({ caseId }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [modifiedStatements, setModifiedStatements] = useState(new Set()); // Track modified statements
   const itemsPerPage = 10;
+  const { reportData, updateReportData } = useReportContext();
+  const { caseId } = reportData;
+
 
   // Fetch statements when component mounts
   useEffect(() => {
@@ -155,7 +152,6 @@ const AccountNumNameManager = ({ caseId }) => {
       statement.filePath?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filteredStatements.length / itemsPerPage);
 
   // Get current page statements
   const currentStatements = filteredStatements.slice(
@@ -163,46 +159,6 @@ const AccountNumNameManager = ({ caseId }) => {
     currentPage * itemsPerPage
   );
 
-  // Generate page numbers
-  const getPageNumbers = () => {
-    const pageNumbers = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) {
-          pageNumbers.push(i);
-        }
-        pageNumbers.push("...");
-        pageNumbers.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pageNumbers.push(1);
-        pageNumbers.push("...");
-        for (let i = totalPages - 3; i <= totalPages; i++) {
-          pageNumbers.push(i);
-        }
-      } else {
-        pageNumbers.push(1);
-        pageNumbers.push("...");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pageNumbers.push(i);
-        }
-        pageNumbers.push("...");
-        pageNumbers.push(totalPages);
-      }
-    }
-    return pageNumbers;
-  };
-
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
 
   if (loading) {
     return (
@@ -248,102 +204,66 @@ const AccountNumNameManager = ({ caseId }) => {
             <TableHeader>
               <TableRow>
                 <TableHead>No.</TableHead>
-                <TableHead>File Location</TableHead>
+                <TableHead>File Name</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Account Number</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentStatements.map((statement, index) => (
-                <TableRow
-                  key={statement.id}
-                  className={
-                    modifiedStatements.has(statement.id) ? "bg-muted/50" : ""
-                  }
-                >
-                  <TableCell>
-                    {(currentPage - 1) * itemsPerPage + index + 1}
-                  </TableCell>
-                  <TableCell>
-                    <div
-                      className="truncate max-w-96"
-                      title={statement.filePath}
-                    >
-                      {statement.filePath}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={statement.customerName || ""}
-                      onChange={(e) =>
-                        handleNameChange(statement.id, e.target.value)
-                      }
-                      className="max-w-52"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      value={statement.accountNumber || ""}
-                      onChange={(e) =>
-                        handleAccNumberChange(statement.id, e.target.value)
-                      }
-                      className="max-w-52"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {modifiedStatements.has(statement.id) && (
-                      <span className="text-sm text-muted-foreground">
-                        Modified
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {currentStatements.map((statement, index) => {
+                const filePath = statement.filePath || "";
+                const filename = filePath.split("\\").pop(); // Get filename from path
+                const filenameWithoutTimestamp = filename
+                  ? filename.substring(filename.indexOf("-") + 1)
+                  : "";
+
+                return (
+                  <TableRow
+                    key={statement.id}
+                    className={modifiedStatements.has(statement.id) ? "bg-muted/50" : ""}
+                  >
+                    <TableCell>
+                      {(currentPage - 1) * itemsPerPage + index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <div
+                        className="truncate max-w-96"
+                        title={filenameWithoutTimestamp}
+                      >
+                        {filenameWithoutTimestamp}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={statement.customerName || ""}
+                        onChange={(e) =>
+                          handleNameChange(statement.id, e.target.value)
+                        }
+                        className="max-w-52"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={statement.accountNumber || ""}
+                        onChange={(e) =>
+                          handleAccNumberChange(statement.id, e.target.value)
+                        }
+                        className="max-w-52"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {modifiedStatements.has(statement.id) && (
+                        <span className="text-sm text-muted-foreground">
+                          Modified
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    className={cn(
-                      "cursor-pointer",
-                      currentPage === 1 && "pointer-events-none opacity-50"
-                    )}
-                  />
-                </PaginationItem>
-
-                {getPageNumbers().map((pageNumber, index) => (
-                  <PaginationItem key={index}>
-                    {pageNumber === "..." ? (
-                      <PaginationEllipsis />
-                    ) : (
-                      <PaginationLink
-                        onClick={() => handlePageChange(pageNumber)}
-                        isActive={currentPage === pageNumber}
-                        className="cursor-pointer"
-                      >
-                        {pageNumber}
-                      </PaginationLink>
-                    )}
-                  </PaginationItem>
-                ))}
-
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    className={cn(
-                      "cursor-pointer",
-                      currentPage === totalPages &&
-                        "pointer-events-none opacity-50"
-                    )}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
 
           <AlertDialog>
             <div className="flex justify-center">

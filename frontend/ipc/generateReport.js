@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const log = require("electron-log");
 const axios = require("axios");
+const sessionManager = require('../SessionManager');
 const databaseManager = require("../db/db");
 const { transactions } = require("../db/schema/Transactions");
 const { statements } = require("../db/schema/Statement");
@@ -29,15 +30,14 @@ const sanitizeJSONString = (jsonString) => {
 };
 
 const validateAndTransformTransaction = (transaction, statementId) => {
+  log.info({ BeforeTransformation: transaction })
   if (!transaction["Value Date"] || !transaction.Description) {
+    log.info("Missing required transaction fields")
     throw new Error("Missing required transaction fields");
   }
-
   let date = null;
   try {
-    // log.info({"before":"conversion",before:transaction["Value Date"]})
     const [day, month, year] = transaction["Value Date"].split("-");
-    // log.info({"after":"conversion",day,month,year})
     date = new Date(year, month - 1, day);
     if (isNaN(date.getTime())) {
       throw new Error("Invalid date");
@@ -47,21 +47,19 @@ const validateAndTransformTransaction = (transaction, statementId) => {
   }
 
   let amount = 0;
-  if (transaction.Credit !== null && !isNaN(transaction.Credit)) {
+  let type = "";
+  if (transaction.Credit !== null && !isNaN(transaction.Credit) && transaction.Credit > 0) {
     amount = Math.abs(transaction.Credit);
-  } else if (transaction.Debit !== null && !isNaN(transaction.Debit)) {
+    type = "credit";
+  } else if (transaction.Debit !== null && !isNaN(transaction.Debit) && transaction.Debit > 0) {
     amount = Math.abs(transaction.Debit);
+    type = "debit";
   }
 
   let balance = 0;
   if (transaction.Balance !== null && !isNaN(transaction.Balance)) {
     balance = parseFloat(transaction.Balance);
   }
-
-  const type =
-    transaction.Credit !== null && !isNaN(transaction.Credit)
-      ? "credit"
-      : "debit";
 
   return {
     statementId,
@@ -71,8 +69,9 @@ const validateAndTransformTransaction = (transaction, statementId) => {
     category: transaction.Category || "uncategorized",
     type: type,
     balance: balance,
-    bank: transaction.Bank || "unknown",
+    bank: transaction.Bank.replace(/\d/g, "") || "unknown",
     entity: transaction.Entity || "unknown",
+    voucher_type: transaction["Voucher type"] || "unknown",
   };
 };
 
@@ -109,6 +108,9 @@ const storeTransactionsBatch = async (transformedTransactions) => {
           balance: t.balance,
           bank: t.bank,
           entity: t.entity,
+
+          voucher_type: t.voucher_type,
+          createdAt: new Date(),
         });
       } else {
         log.info(
@@ -116,6 +118,8 @@ const storeTransactionsBatch = async (transformedTransactions) => {
         );
       }
     }
+
+    log.info({ uniqueTransactions });
 
     if (uniqueTransactions.length === 0) {
       log.info("No new unique transactions to store");
@@ -135,8 +139,10 @@ const storeTransactionsBatch = async (transformedTransactions) => {
 
     const chunkSize = 50;
     console.log("Unique Transactions : ", uniqueTransactions.length);
+    log.info({ uniqueTransactionsExample: uniqueTransactions[1] });
     for (let i = 0; i < uniqueTransactions.length; i += chunkSize) {
       const chunk = uniqueTransactions.slice(i, i + chunkSize);
+      console.log("Chunk Size : ", chunk.length);
       await db.insert(transactions).values(chunk);
       log.info(
         `Stored transactions batch ${i / chunkSize + 1}, size: ${chunk.length}`
@@ -150,7 +156,11 @@ const storeTransactionsBatch = async (transformedTransactions) => {
   }
 };
 
-const getOrCreateCase = async (caseName, userId = 1) => {
+const getOrCreateCase = async (caseName) => {
+
+  const userId = sessionManager.getUserId() || 1;
+  log.info("User ID : ", userId);
+
   try {
     // First try to find existing case with exact match on name
     const existingCase = await db
@@ -158,8 +168,7 @@ const getOrCreateCase = async (caseName, userId = 1) => {
       .from(cases)
       .where(
         and(
-          eq(cases.name, caseName)
-          // eq(cases.userId, userId),
+          eq(cases.name, caseName),
           // eq(cases.status, "active")
         )
       )
@@ -173,6 +182,7 @@ const getOrCreateCase = async (caseName, userId = 1) => {
     }
 
     log.info({ creatingNewCase: caseName });
+
     // Create new case if not found
     const newCase = await db
       .insert(cases)
@@ -244,27 +254,60 @@ const getOrCreateCase = async (caseName, userId = 1) => {
 
 const processStatementAndEOD = async (
   fileDetail,
-  transactions_temp, // renamed cuz we had a schema as transactions
+  transactions_temp,
   eodData,
   caseName,
   nerResults,
-  fileIndex
+  fileIndex,
+  successPageNumber // Add this parameter
 ) => {
+  log.info("inside", successPageNumber);
   try {
     const validCaseId = await getOrCreateCase(caseName);
     let statementId = null;
     let processedTransactions = 0;
 
+    // Update the pages count in the cases table
+    if (typeof successPageNumber === "number" && !isNaN(successPageNumber)) {
+      log.info(
+        `Updating pages count to ${successPageNumber} for case ${validCaseId}`
+      );
+      try {
+        await db
+          .update(cases)
+          .set({
+            pages: successPageNumber,
+            updatedAt: new Date(),
+          })
+          .where(eq(cases.id, validCaseId));
+
+        log.info(
+          `Updated pages count to ${successPageNumber} for case ${validCaseId}`
+        );
+      } catch (error) {
+        log.error(
+          `Failed to update pages count for case ${validCaseId}:`,
+          error
+        );
+        // Continue processing even if page count update fails
+      }
+    }
+
     // Get NER results for this file using passed fileIndex
     const customerName = nerResults?.Name?.[fileIndex] || "UNKNOWN";
     const accountNumber = nerResults?.["Acc Number"]?.[fileIndex] || "UNKNOWN";
+    log.info("transaction_temp", { len: transactions_temp.length, example: transactions_temp[1] });
+    log.info("fileDetail ", { fileDetail });
+    // const tempBankName = fileDetail.bankName.replace(/\d/g, "");
+    // log.info({withFileIndex:fileDetail.bankName+fileIndex})
 
-    // First validate all transactions before creating the statement
+    // Rest of the existing function code remains the same...
     const statementTransactions = transactions_temp
-      .filter((t) => t.Bank === fileDetail.bankName)
+      // .filter((t) => t.Bank.replace(/\d/g, "") === fileDetail.bankName)
+      .filter((t) => t.Bank === fileDetail.bankName + fileIndex)
       .map((transaction) => {
         try {
-          return validateAndTransformTransaction(transaction, null); // Pass null for statementId initially
+          return validateAndTransformTransaction(transaction, null);
         } catch (error) {
           log.warn(
             `Invalid transaction found during validation: ${error.message}`,
@@ -275,7 +318,6 @@ const processStatementAndEOD = async (
       })
       .filter(Boolean);
 
-    // If no valid transactions found, throw error
     if (statementTransactions.length === 0) {
       throw new Error("No valid transactions found for statement");
     }
@@ -298,7 +340,7 @@ const processStatementAndEOD = async (
         createdAt: new Date(),
         startDate: start_date,
         endDate: end_date,
-        password:fileDetail.passwords
+        password: fileDetail.passwords,
       };
 
       log.info({ addingStatementData: statementData });
@@ -313,7 +355,6 @@ const processStatementAndEOD = async (
       }
 
       statementId = statementResult[0].id;
-      // Now update transactions with the new statementId and store them
       const finalTransactions = statementTransactions.map((transaction) => ({
         ...transaction,
         statementId,
@@ -325,10 +366,8 @@ const processStatementAndEOD = async (
       throw error;
     }
 
-    // Process EOD data if available
     if (eodData && Array.isArray(eodData)) {
       try {
-        // Check if EOD data already exists for this case
         const existingEOD = await db
           .select()
           .from(eod)
@@ -426,7 +465,9 @@ const processSummaryData = async (parsedData, caseName) => {
       // !parsedData["Particulars"] ||
       !parsedData["Income Receipts"] ||
       !parsedData["Important Expenses"] ||
-      !parsedData["Other Expenses"]
+      !parsedData["Other Expenses"] ||
+      !parsedData["Contra Debit"] ||
+      !parsedData["Contra Credit"]
     ) {
       throw new Error("Invalid summary data provided");
     }
@@ -437,6 +478,8 @@ const processSummaryData = async (parsedData, caseName) => {
       incomeReceipts: parsedData["Income Receipts"],
       importantExpenses: parsedData["Important Expenses"],
       otherExpenses: parsedData["Other Expenses"],
+      contraDebit: parsedData["Contra Debit"],
+      contraCredit: parsedData["Contra Credit"],
     };
 
     // Check if summary data already exists for this case
@@ -622,28 +665,7 @@ function generateReportIpc(tmpdir_path) {
   const baseUrl = `http://localhost:7500`;
   const generateReportEndpoint = `${baseUrl}/analyze-statements/`;
   const editPdfEndpoint = `${baseUrl}/column-rectify-add-pdf/`;
-  // const client = axios.create({ socketPath: udsPath, baseURL: 'http://unix' });
-  // const payload = {
-  //   bank_names: ["ICICI", "HDFC"],
-  //   pdf_paths: ['/home/Downloads/ICICI.pdf', '/home/Downloads/HDFC.pdf'],
-  //   passwords: ["1234", "1234"],
-  //   start_date: ["2023-01-01", "2023-01-01"],
-  //   end_date: ["2023-12-31", "2023-12-31"],
-  //   ca_id: "DEFAULT_CASE",
-  // };
-  // const client = new axios.Axios({ socketPath: `unix://${udsPath}`, baseURL: 'http://localhost' });
-  // console.log("Client : ", client);
-  // client.post("/", 'test', {
-  //   headers: { "Content-Type": "application/json" },
-  //   timeout: 300000,
-  // }).then((res) => {
-  //   console.log(res.status);
-  //   console.log(res.data);
-  // }).catch((err) => {
-  //   console.error(err.response.data);
-  //   console.error(err.message);
-  //   console.error(err.response.data.detail[0].loc);
-  // });
+
   ipcMain.handle("generate-report", async (event, receivedResult, caseName) => {
     const caseId = await getOrCreateCase(caseName);
     // Track file status
@@ -716,9 +738,10 @@ function generateReportIpc(tmpdir_path) {
       });
 
       log.info("API response received:", response.data);
+      log.info("missing month list", response.data?.["missing_months_list"]);
 
       // Step 3: Handle failed extractions
-      if (response.data?.["pdf_paths_not_extracted"]) {
+      if (response.data?.["pdf_paths_not_extracted"]?.paths?.length > 0) {
         const failedPdfPaths =
           response.data["pdf_paths_not_extracted"].paths || [];
 
@@ -741,9 +764,11 @@ function generateReportIpc(tmpdir_path) {
 
         log.warn("Some PDF paths were not extracted", Array.from(failedFiles));
       }
+      log.info("success page ", response.data?.["success_page_number"]);
 
       // Step 4: Process transactions
       const parsedData = JSON.parse(sanitizeJSONString(response.data.data));
+
       if (parsedData == null) {
         await updateCaseStatus(caseId, "Failed");
         const failedPDFsDir = path.join(tmpdir_path, "failed_pdfs", caseName);
@@ -767,6 +792,8 @@ function generateReportIpc(tmpdir_path) {
         };
       }
 
+      console.log("parsedData transactions", parsedData.Transactions);
+
       const transactions_temp = (parsedData.Transactions || []).filter(
         (transaction) => {
           if (
@@ -789,11 +816,14 @@ function generateReportIpc(tmpdir_path) {
         }
       );
 
+      console.log("transactions_temp", transactions_temp.length, { example: transactions_temp[1] });
+
       // Step 5: Process each file
       const processedData = [];
-      log.info({ exampleFileDetails: fileDetails });
+      // log.info({ exampleFileDetails: fileDetails });
 
       for (const fileDetail of fileDetails) {
+        console.log({ fileDetail })
         try {
           const result = await processStatementAndEOD(
             fileDetail,
@@ -801,7 +831,8 @@ function generateReportIpc(tmpdir_path) {
             parsedData.EOD,
             caseName,
             response.data?.ner_results || { Name: [], "Acc Number": [] },
-            fileDetails.indexOf(fileDetail)
+            fileDetails.indexOf(fileDetail),
+            response.data?.success_page_number
           );
           processedData.push(result);
 
@@ -819,6 +850,8 @@ function generateReportIpc(tmpdir_path) {
       }
 
       // Step 6: Process summary and earnings
+      // print the parsedData keys
+      log.info("Parsed Data Keys: ", Object.keys(parsedData));
       try {
         await processSummaryData(
           {
@@ -826,6 +859,8 @@ function generateReportIpc(tmpdir_path) {
             "Income Receipts": parsedData["Income Receipts"] || [],
             "Important Expenses": parsedData["Important Expenses"] || [],
             "Other Expenses": parsedData["Other Expenses"] || [],
+            "Contra Debit": parsedData["Contra Debit"] || [],
+            "Contra Credit": parsedData["Contra Credit"] || [],
           },
           caseName
         );
@@ -866,6 +901,8 @@ function generateReportIpc(tmpdir_path) {
       //   }
       // }
 
+      log.info("missingMonthsList", response.data?.["missing_months_list"]);
+
       return {
         success: true,
         data: {
@@ -884,6 +921,7 @@ function generateReportIpc(tmpdir_path) {
             Name: [],
             "Acc Number": [],
           },
+          missingMonthsList: response.data?.["missing_months_list"] || [],
         },
       };
     } catch (error) {
@@ -902,6 +940,7 @@ function generateReportIpc(tmpdir_path) {
         failedFiles: Array.from(failedFiles || []),
         successfulFiles: Array.from(successfulFiles || []),
         nerResults: {},
+        missingMonthsList: [],
       };
     }
   });
@@ -974,7 +1013,7 @@ function generateReportIpc(tmpdir_path) {
         // Get the case ID
         const validCaseId = await getOrCreateCase(caseName);
 
-        log.info({validCaseId})
+        log.info({ validCaseId });
 
         // // Store failed statements in the database
         // await db.insert(failedStatements).values({
@@ -988,7 +1027,7 @@ function generateReportIpc(tmpdir_path) {
       }
 
       // Continue processing if data exists
-      if (!response.data ) {
+      if (!response.data) {
         throw new Error(
           "Empty or invalid response received from analysis server"
         );
@@ -1010,7 +1049,8 @@ function generateReportIpc(tmpdir_path) {
               totalTransactions: 0,
               eodProcessed: false,
               summaryProcessed: false,
-              failedStatements: response.data["pdf_paths_not_extracted"] || null,
+              failedStatements:
+                response.data["pdf_paths_not_extracted"] || null,
               failedFiles: Array.from(failedFiles),
               successfulFiles: Array.from(successfulFiles),
               nerResults: response.data?.ner_results || {
@@ -1107,6 +1147,8 @@ function generateReportIpc(tmpdir_path) {
             "Income Receipts": parsedData["Income Receipts"] || [],
             "Important Expenses": parsedData["Important Expenses"] || [],
             "Other Expenses": parsedData["Other Expenses"] || [],
+            "Contra Credit": parsedData["Contra Credit"] || [],
+            "Contra Debit": parsedData["Contra Debit"] || [],
           },
           caseName
         );
@@ -1130,15 +1172,15 @@ function generateReportIpc(tmpdir_path) {
       }
 
       // Cleanup
-      fileDetails.forEach((detail) => {
-        try {
-          if (fs.existsSync(detail.pdf_paths)) {
-            fs.unlinkSync(detail.pdf_paths);
-          }
-        } catch (error) {
-          log.warn(`Failed to cleanup temp file: ${detail.pdf_paths}`, error);
-        }
-      });
+      // fileDetails.forEach((detail) => {
+      //   try {
+      //     if (fs.existsSync(detail.pdf_paths)) {
+      //       fs.unlinkSync(detail.pdf_paths);
+      //     }
+      //   } catch (error) {
+      //     log.warn(`Failed to cleanup temp file: ${detail.pdf_paths}`, error);
+      //   }
+      // });
       await updateCaseStatus(caseId, "Success");
 
       return {

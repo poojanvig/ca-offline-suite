@@ -33,12 +33,16 @@ import {
   Undo2,
   ShieldPlus,
 } from "lucide-react";
+import { useReportContext } from "../contexts/ReportContext";
+import DashboardDropdown from "../components/IndividualDashboardComponents/DashboardDropdown";
 
 const IndividualDashboard = () => {
   const [activeTab, setActiveTab] = useState("Summary");
   const { breadcrumbs, setIndividualDashboard } = useBreadcrumb();
   const { caseId, individualId, defaultTab } = useParams();
-  const [customerName, setCustomerName] = useState(null);
+  const { reportData, updateReportData } = useReportContext();
+  const { currentCustomerName, setCurrentCustomerName } = useState(null);
+
   const [navItems, setNavItems] = useState([
     {
       title: "Summary",
@@ -101,60 +105,44 @@ const IndividualDashboard = () => {
   useEffect(() => {
     setIndividualDashboard(
       activeTab,
-      `/individual-dashboard/${caseId}/${individualId}/${activeTab}`
+      `/individual-dashboard/${caseId}/${
+        individualId || "combined"
+      }/${activeTab}`
     );
-
-    console.log(
-      "CaseId : ",
-      caseId,
-      "Default Tab : ",
-      defaultTab,
-      " activetab",
-      activeTab
-    );
-  }, [activeTab]);
+  }, [activeTab, caseId, individualId, setIndividualDashboard]);
 
   useEffect(() => {
-    const fetchCustomerName = async () => {
-      console.log("Fetching customer name for individual ID:", individualId);
-      try {
-        const customerName = await window.electron.getCustomerName(
-          individualId
-        );
-        console.log("Customer name fetched successfully:", customerName);
-        if (customerName) {
-          setCustomerName(customerName);
-        }
-      } catch (error) {
-        console.error("Error fetching customer name:", error);
-      }
-    };
-
-    if (individualId!==undefined) {
-      // Only fetch if we have an ID
-      fetchCustomerName();
-      // hide eod for individual
-      setNavItems((prev) => {
-        return prev.filter((item) => item.title !== "EOD");
+    if (
+      individualId === undefined ||
+      individualId === null ||
+      individualId === "undefined"
+    ) {
+      updateReportData({
+        ...reportData,
+        individualId: null,
+        customerName: null,
       });
-    }else{
+      if (!navItems.find((item) => item.title === "EOD")) {
       // show eod for where individual id is not present, first check if it is already present
-      if(!navItems.find((item) => item.title === "EOD")){
+
         setNavItems((prev) => {
-          return [...prev, {
-            title: "EOD",
-            icon: History,
-          }]
+          return [
+            ...prev,
+            {
+              title: "EOD",
+              icon: History,
+            },
+          ];
         });
       }
+     
+    } else {
+    // hide eod for individual
+    setNavItems((prev) => {
+      return prev.filter((item) => item.title !== "EOD");
+    });
     }
   }, []);
-
-  useEffect(() => {
-    console.log({ caseId, individualId, defaultTab });
-  }, []);
-
-
 
   useEffect(() => {
     if (defaultTab === "defaultTab") setActiveTab(navItems[0].title);
@@ -178,49 +166,29 @@ const IndividualDashboard = () => {
           navItems={navItems}
           activeTab={activeTab}
           setActiveTab={handleTabChange}
-          name={customerName}
         />
         <ScrollArea className="w-full">
-          <BreadcrumbDynamic items={breadcrumbs} />
+          <div className="flex justify-between items-center w-full pr-14">
+            <BreadcrumbDynamic items={breadcrumbs} />
+            {/* <div>
+              <DashboardDropdown />
+            </div> */}
+          </div>
           <div className="flex-1 flex flex-col overflow-hidden">
             <main className="flex-1">
-              {activeTab === "Summary" && (
-                <Summary caseId={caseId} individualId={individualId} />
-              )}
+              {activeTab === "Summary" && <Summary />}
               {activeTab === "Transactions" && <Transactions />}
-              {activeTab === "Debtors" && (
-                <Debtors caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Creditors" && (
-                <Creditors caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "EMI" && (
-                <EMI caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Investment" && (
-                <Investment caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "EOD" && (
-                <EodBalance caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Cash" && (
-                <Cash caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "UPI" && (
-                <Upi caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Suspense" && (
-                <Suspense caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Reversal" && (
-                <Reversal caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Insurance" && (
-                <Insurance caseId={caseId} individualId={individualId} />
-              )}
-              {activeTab === "Contra" && (
-                <Contra caseId={caseId} individualId={individualId} />
-              )}
+              {activeTab === "Debtors" && <Debtors />}
+              {activeTab === "Creditors" && <Creditors />}
+              {activeTab === "EMI" && <EMI />}
+              {activeTab === "Investment" && <Investment />}
+              {activeTab === "EOD" && <EodBalance />}
+              {activeTab === "Cash" && <Cash />}
+              {activeTab === "UPI" && <Upi />}
+              {activeTab === "Suspense" && <Suspense />}
+              {activeTab === "Reversal" && <Reversal />}
+              {activeTab === "Insurance" && <Insurance />}
+              {activeTab === "Contra" && <Contra />}
             </main>
           </div>
         </ScrollArea>

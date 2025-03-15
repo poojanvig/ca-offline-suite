@@ -14,7 +14,7 @@ from backend.utils import get_saved_pdf_dir
 TEMP_SAVED_PDF_DIR = get_saved_pdf_dir()
 from pydantic import Field
 # If you have other custom imports:
-from backend.tax_professional.banks.CA_Statement_Analyzer import start_extraction_add_pdf, refresh_category_all_sheets, save_to_excel
+from backend.tax_professional.banks.CA_Statement_Analyzer import start_extraction_add_pdf, refresh_category_all_sheets, save_to_excel,individual_summary
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from backend.account_number_ifsc_extraction import extract_accno_ifsc
@@ -84,6 +84,9 @@ class ExcelDownloadRequest(BaseModel):
 
 class DummyRequest(BaseModel):
     data: str
+
+class InvididualSummaryRequest(BaseModel):
+    transactions_data:  List[dict]
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -176,7 +179,15 @@ async def analyze_bank_statements(request: BankStatementRequest):
 
         logger.info("Starting extraction")
         whole_transaction_sheet = request.whole_transaction_sheet or None
-        result = start_extraction_add_pdf(bank_names, pdf_paths, passwords, start_date, end_date, CA_ID, progress_data,whole_transaction_sheet=whole_transaction_sheet)
+        temp_aiyaz_array_of_array = []
+        if(request.aiyazs_array_of_array):
+            for statement in request.aiyazs_array_of_array:
+                temp_aiyaz_array = []
+                for col in statement:
+                    temp_aiyaz_array.append(col.model_dump())
+                temp_aiyaz_array_of_array.append(temp_aiyaz_array)
+                
+        result = start_extraction_add_pdf(bank_names, pdf_paths, passwords, start_date, end_date, CA_ID, progress_data,whole_transaction_sheet=whole_transaction_sheet,aiyazs_array_of_array=temp_aiyaz_array_of_array)
         
         print("RESULT GENERATED")
         logger.info("Extraction completed successfully")
@@ -186,7 +197,8 @@ async def analyze_bank_statements(request: BankStatementRequest):
             "data": result["sheets_in_json"],
             "pdf_paths_not_extracted": result["pdf_paths_not_extracted"],
             "ner_results": ner_results, 
-            # "success_page_number": result["success_page_number"]
+            "success_page_number": result["success_page_number"],
+            "missing_months_list":result["missing_months_list"]
         }
 
     except Exception as e:
@@ -328,12 +340,16 @@ async def edit_category(request: EditCategoryRequest):
         transaction_data = request.transaction_data
         new_categories = request.new_categories
         eod_data = request.eod_data
+        print("New Categories : ", new_categories)
+        print("Transaction Data : ", transaction_data)
+        print("EOD Data : ", eod_data)
         logger.info(f"Received request with new categories: {new_categories}")
         logger.info(f"Received request with transaction data: {transaction_data[0]}")
         logger.info(f"Received request with eod data: {eod_data}")
 
         # convert transaction_data to df
         transaction_df = pd.DataFrame(transaction_data)
+        print("Transactions : ", transaction_df.head())
         transaction_df["Value Date"] = pd.to_datetime(transaction_df["Value Date"], format="%d-%m-%Y")
         eod_df = pd.DataFrame(eod_data)
         print("Transactions : ", transaction_df.head())
@@ -383,6 +399,25 @@ async def excel_download(request: ExcelDownloadRequest):
             status_code=500, detail=f"{str(e)}"
         )
 
+@app.post("/individual-summary/")
+async def individual_summary_api(request: InvididualSummaryRequest):
+    try:
+        logger.info(f"Received request with data: {request.transactions_data}")
+
+        transaction_df = pd.DataFrame(request.transactions_data)
+        transaction_df["Value Date"] = pd.to_datetime(transaction_df["Value Date"], format="%d-%m-%Y")
+        print(transaction_df.head(10))
+        data = individual_summary(transaction_df)
+        print(data)
+
+        return data
+
+    except Exception as e:
+        print(e)
+        logger.error(f"Error processing bank statements: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error processing bank statements: {str(e)}"
+        )
 
 if __name__ == "__main__":
     # Optionally use environment variables for host/port. Falls back to "127.0.0.1" and 7500 if none provided.

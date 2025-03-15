@@ -14,41 +14,43 @@ const Transactions = () => {
 
   useEffect(() => {
   }, [individualId]);
+  const fetchTransactions = async () => {
+    try {
 
+      // Add this line to debug the electron call
+      const data = await  window.electron.getTransactions(
+        caseId,
+        parseInt(individualId)
+      );
+
+      // Transform the data to only include required fields
+      const formattedData = data.map((transaction) => ({
+        
+        date: new Date(transaction.date).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }),
+        description: transaction.description,
+        amount: transaction.amount,
+        category: transaction.category,
+        type: transaction.type,
+        balance: transaction.balance,
+        bank: transaction.bank,
+        id:transaction.id,
+        entity: transaction.entity,
+        voucher_type: transaction.voucher_type,
+      }));
+      setTransactionData(formattedData);
+    } catch (err) {
+      setError("Failed to fetch transactions");
+      console.error("Error fetching transactions:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-
-        // Add this line to debug the electron call
-        const data = await  window.electron.getTransactions(
-          caseId,
-          parseInt(individualId)
-        );
-
-        // Transform the data to only include required fields
-        const formattedData = data.map((transaction) => ({
-          
-          date: new Date(transaction.date).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          }),
-          description: transaction.description,
-          amount: transaction.amount,
-          category: transaction.category,
-          type: transaction.type,
-          balance: transaction.balance,
-          bank: transaction.bank,
-          id:transaction.id
-        }));
-        setTransactionData(formattedData);
-      } catch (err) {
-        setError("Failed to fetch transactions");
-        console.error("Error fetching transactions:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  
 
     fetchTransactions();
   }, []);
@@ -79,10 +81,12 @@ const Transactions = () => {
         amount: transaction.amount,
         balance: transaction.balance,
         category: transaction.category,
+        voucher_type: transaction.voucher_type,
+        entity: transaction.entity,
         bank: transaction.bank,
         // entity: transaction.entity,
         type: transaction.type,
-        id:transaction.id
+        id:transaction.id,
       };
 
 
@@ -107,9 +111,10 @@ const Transactions = () => {
         transaction.type.toLowerCase() === "debit" ? transaction.amount : 0,
       balance: transaction.balance,
       category: transaction.category,
+      voucher_type: transaction.voucher_type,
+      entity: transaction.entity,
       bank: transaction.bank,
-      id:transaction.id
-      // entity: transaction.entity,
+      id:transaction.id,
     }));
   };
 
@@ -176,7 +181,7 @@ const Transactions = () => {
 
           {selectedMonths.length === 0 ? (
             <div className="text-center text-gray-600 dark:text-gray-400 my-6">
-              Select months to display the graphs
+              Select months to view data
             </div>
           ) : (
             <>
@@ -242,6 +247,7 @@ const Transactions = () => {
                 data={filteredData}
                 title="Transactions"
                 caseId={parseInt(caseId)}
+                refreshFunction={fetchTransactions}
               />
             </>
           )}

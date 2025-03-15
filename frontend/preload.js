@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld("electron", {
 
   getReportsProcessed: () => ipcRenderer.invoke("get-reports-processed"),
   getStatementsProcessed: () => ipcRenderer.invoke("get-statements-processed"),
+  getTransactionsProcessed: () =>
+    ipcRenderer.invoke("get-transaction-processed"),
+
+  getPages: () => ipcRenderer.invoke("get-total-pages"),
+
+  getProgressed: () => ipcRenderer.invoke("get-user-progress"),
 
   getTransactions: (caseId, individualId) =>
     ipcRenderer.invoke("get-transactions", caseId, individualId),
@@ -17,7 +23,8 @@ contextBridge.exposeInMainWorld("electron", {
   getTransactionsCount: (caseId) =>
     ipcRenderer.invoke("get-transactions-count", caseId),
   getEodBalance: (caseId) => ipcRenderer.invoke("get-eod-balance", caseId),
-  getSummary: (caseId) => ipcRenderer.invoke("get-summary", caseId),
+  getSummary: (caseId, individualId) =>
+    ipcRenderer.invoke("get-summary", caseId, individualId),
   getTransactionsByDebtor: (caseId, individualId) =>
     ipcRenderer.invoke("get-transactions-by-debtor", caseId, individualId),
 
@@ -103,13 +110,14 @@ contextBridge.exposeInMainWorld("electron", {
   downloadExcelReport: (data) =>
     ipcRenderer.invoke("download-excel-report", data),
 
-  getTallyVoucher: (caseId, voucherType) =>
-    ipcRenderer.invoke("get-tally-voucher", caseId, voucherType),
-
+  getTallyVoucherTransactions: (caseId, voucherType) =>
+    ipcRenderer.invoke("get-tally-voucher-transactions", caseId, voucherType),
 
   updateTransactionStatus: (transactionIds) =>
     ipcRenderer.invoke("update-transaction-status", transactionIds),
-  
+
+  editVoucherType: (data) => ipcRenderer.invoke("update-voucher", data),
+  uploadLedgerToTally: (data) => ipcRenderer.invoke("ledger-create", data),
   user: {
     getData: (userId) => ipcRenderer.invoke("user:get-data", userId),
     updateData: (userData) => ipcRenderer.send("user:update-data", userData),
@@ -146,6 +154,9 @@ contextBridge.exposeInMainWorld("electron", {
   editPdf: (result, reportName) =>
     ipcRenderer.invoke("edit-pdf", result, reportName),
   editEntity: (payload) => ipcRenderer.invoke("edit-entity", payload),
+  uploadToTally: (data) => ipcRenderer.invoke("tally-upload", data),
+  getProgressed: () => ipcRenderer.invoke("get-user-progress"),
+
 
   // Add auto-update related methods
   updates: {

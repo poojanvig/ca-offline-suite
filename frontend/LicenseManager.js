@@ -5,9 +5,21 @@ const crypto = require("crypto");
 const log = require("electron-log");
 const { uuid } = require("systeminformation");
 
+const isDev = process.env.NODE_ENV === "development";
+log.info('License manager process.env.NODE_ENV', isDev);
+
 const SERVICE_NAME = "Cyphersol-dumm";
 const LICENSE_KEY_ACCOUNT = "license-key";
-const API_URL = "http://43.204.61.215/validate-offlineapp-login/";
+
+
+const API_URL = isDev ? "https://cyphersol-uat.duckdns.org/validate-offlineapp-login/" : process.env.API_URL || "https://cyphersol.co.in/validate-offlineapp-login/";
+// const API_URL = "https://cyphersol.co.in/validate-offlineapp-login/";
+
+log.info("API URL : ", API_URL)
+
+
+const toValidateLicense = process.env.VALIDATE_LICENSE == "true"
+log.info("Validate License : ", toValidateLicense);
 // const API_URL = "http://127.0.0.1/validate-offlineapp-login/";
 // username : 2-32e6d741
 // licensekey : SOMEX4Y4ZLicenseKEYForCAOffline
@@ -167,48 +179,58 @@ class LicenseManager {
                 uuidHash = await this.getHashedUUID();
             }
 
-            const payload = {
-                username: username,
-                license_key: licenseKey,
-                timestamp: timestamp,
-                is_activated: isActivated,
-                uuid_hash: uuidHash
-            };
-            // const apiKey =
-            //     "U08fir-OsEXdgMZKARdgz5oPvyRT6cIZioOeV_kZdLMeXsAc46_x.CAgICAgICAo=";
-            const apiKey =
-                "L4#gP93NEuzyXQFYAGk_KhY2SDHzJJ-O0fqFMlxJ46HZkNLtpdBI.CAgICAgICAk=";
+            if (toValidateLicense) {
+                const payload = {
+                    username: username,
+                    license_key: licenseKey,
+                    timestamp: timestamp,
+                    is_activated: isActivated,
+                    uuid_hash: uuidHash
+                };
 
-            const response = await axios.post(
-                API_URL,
-                payload,
-                {
-                    headers: {
-                        "X-API-Key": apiKey,
-                    },
+                const apiKey = "L4#gP93NEuzyXQFYAGk_KhY2SDHzJJ-O0fqFMlxJ46HZkNLtpdBI.CAgICAgICAk=";
+
+                const response = await axios.post(
+                    API_URL,
+                    payload,
+                    {
+                        headers: {
+                            "X-API-Key": apiKey,
+                        },
+                    }
+                );
+
+                // console.log("License Validation Response : ", response);
+                const { data } = response;
+                console.log("Response Status : ", response.status);
+                console.log("Data : ", data);
+
+                // Handle successful response
+                if (response.status === 200) {
+                    const expiryTimestamp = data.expiry_timestamp;
+                    const currentTimestamp = Date.now() / 1000;
+
+                    // Check if the license has expired
+                    if (currentTimestamp > expiryTimestamp) {
+                        throw new Error("License key has expired");
+                    }
+
+                    return { success: true, data: data };
+                } else {
+                    // Handle invalid license or username
+                    throw new Error(data.detail || "License validation failed");
                 }
-            );
 
-            // console.log("License Validation Response : ", response);
-            const { data } = response;
-            console.log("Response Status : ", response.status);
-            console.log("Data : ", data);
+            }
+            else {
 
-            // Handle successful response
-            if (response.status === 200) {
-                const expiryTimestamp = data.expiry_timestamp;
-                const currentTimestamp = Date.now() / 1000;
-
-                // Check if the license has expired
-                if (currentTimestamp > expiryTimestamp) {
-                    throw new Error("License key has expired");
+                const data = {
+                    expiry_timestamp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60 // Current time in seconds + 30 days
                 }
 
                 return { success: true, data: data };
-            } else {
-                // Handle invalid license or username
-                throw new Error(data.detail || "License validation failed");
             }
+
         } catch (error) {
             console.error(
                 "License validation error: ",

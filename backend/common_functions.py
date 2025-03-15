@@ -306,7 +306,7 @@ def extraction_process(bank, pdf_path, pdf_password, start_date, end_date):
     empty_idf = pd.DataFrame()
     default_name_n_num = ["_", "XXXXXXXXXX"]
     a = ""
-    bank = re.sub(r"\d+", "", bank)
+    # bank = re.sub(r"\d+", "", bank)
     ext = extract_extension(pdf_path)
 
     try:
@@ -361,7 +361,7 @@ def extraction_process_explicit_lines(bank, pdf_path, pdf_password, start_date, 
     CA_ID = "1234_temp"
     empty_idf = pd.DataFrame()
     default_name_n_num = ["_", "XXXXXXXXXX"]
-    bank = re.sub(r"\d+", "", bank)
+    # bank = re.sub(r"\d+", "", bank)
     a = ""
 
     try:
@@ -2453,6 +2453,7 @@ def summary_sheet(idf, open_bal, close_bal, new_tran_df, new_categories = None):
 
 
 def transaction_sheet( df):
+    # print all cols of df
     if len(df["Bank"].unique()) > 1:
         tdf = df[
             [
@@ -2464,12 +2465,13 @@ def transaction_sheet( df):
                 "Category",
                 "Entity",
                 "Bank",
+                "Voucher type"
             ]
         ]
     else:
         #1234_temp
         tdf = df[
-            ["Value Date", "Description", "Debit", "Credit", "Balance", "Category","Entity","Bank"]
+            ["Value Date", "Description", "Debit", "Credit", "Balance", "Category","Entity","Bank","Voucher type"]
         ]
     return tdf
 

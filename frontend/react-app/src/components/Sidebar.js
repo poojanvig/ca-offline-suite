@@ -21,26 +21,104 @@ import {
 } from "./ui/dropdown-menu";
 import logo from "../data/assets/logo.png";
 import { useAuth } from "../contexts/AuthContext";
+import { useReportContext } from "../contexts/ReportContext";
+import { useParams } from "react-router-dom";
+
 
 const SidebarDynamic = ({
   navItems,
   activeTab,
   setActiveTab,
-  name,
-  caseId,
-  reportName,
 }) => {
-  const { logout, setError } = useAuth();
+  const { logout, setError, user } = useAuth();
   const navigate = useNavigate();
   const { isCollapsed } = useSidebar();
-  const [user] = React.useState({
-    name: "",
-    email: "",
-    avatar: "#",
-  });
+  const { reportData, updateReportData } = useReportContext();
+  const {caseId,individualId} = useParams();
 
-  const isIndividualDashboard = Boolean(name);
-  const isCaseDashboard = Boolean(caseId);
+  // Get initials for avatar fallback
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const tabs = navItems.map((item) => item.title);
+
+
+  // const isIndividualDashboard =false;
+  // const isCaseDashboard = false;
+
+  const isIndividualDashboard = tabs.includes("Summary");
+  const isCaseDashboard = tabs.includes("Reports");
+  let isCombinedInvidualDashboard = tabs.includes("Summary") && (reportData.individualId===null || reportData.individualId===undefined || reportData.individualId==='undefined'|| reportData.individualId==='combined') 
+
+
+  useEffect(()=>{
+    let fetchedCustomerName = reportData.customerName
+    let fetchedReportName = reportData.reportName
+
+    const fetchCustomerName = async () => {
+      console.log("Fetching customer name for individual ID:", individualId);
+      try {
+        const customerNametemp = await window.electron.getCustomerName(
+          individualId
+        );
+        if (customerNametemp) {
+          console.log("Customer name fetched successfully:", customerNametemp);
+       
+          updateReportData({
+            ...reportData,
+            customerName:customerNametemp,
+            caseId,
+            individualId,
+            reportName:fetchedReportName
+          })
+          fetchedCustomerName=customerNametemp
+        }
+      } catch (error) {
+        console.error("Error fetching customer name:", error);
+      }
+    };
+
+    const fetchReportName = async () => {
+      try {
+        const reportName = await window.electron.getReportName(caseId);
+      
+        updateReportData({
+          ...reportData,
+          reportName,
+          caseId,
+          individualId,
+          customerName:fetchedCustomerName
+        })
+        
+        fetchedReportName=reportName
+
+      } catch (error) {
+        console.error("Error fetching report name:", error);
+      }
+    };
+    if( individualId === undefined ||
+      individualId === null ||
+      individualId === "undefined"||
+      individualId === "combined"){
+      if(!fetchedReportName)
+        fetchReportName();
+    }
+    else{
+      if(!fetchedCustomerName)
+        fetchCustomerName();
+    }
+    
+   
+  },[caseId,individualId])
+  
+  console.log({navItems,individualId,caseId,reportData})
 
   useEffect(() => {
     console.log({ isCollapsed });
@@ -98,30 +176,33 @@ const SidebarDynamic = ({
 
     return (
       <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg shadow-sm">
-        {isIndividualDashboard && (
+        {(isIndividualDashboard && !isCombinedInvidualDashboard) && (
           <div className="space-y-1">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
               Account Name :{" "}
               <span className="text-sm text-gray-800 dark:text-gray-200 font-semibold hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-300">
-                {name}
+                {reportData.customerName}
               </span>
             </p>
           </div>
         )}
-        {isCaseDashboard && (
+        {(isCaseDashboard || isCombinedInvidualDashboard) && (
           <div className="space-y-2">
-            {reportName && (
+            {reportData.reportName && (
               <div>
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                   Report Name :{" "}
                   <span className="text-sm text-gray-800 dark:text-gray-200 font-semibold hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-300">
-                    {reportName}
+                    {reportData.reportName}
                   </span>
                 </p>
               </div>
             )}
           </div>
         )}
+
+
+        
       </div>
     );
   };
@@ -139,15 +220,19 @@ const SidebarDynamic = ({
       <DropdownMenuTrigger asChild>
         <button className="flex items-center w-full p-2 hover:bg-gray-100 rounded-md transition-all duration-200">
           <Avatar className="h-8 w-8 rounded-lg">
-            <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback className="rounded-lg">HJ</AvatarFallback>
+            <AvatarImage src={user?.avatar} alt={user?.name || "User"} />
+            <AvatarFallback className="rounded-lg">
+              {getInitials(user?.name)}
+            </AvatarFallback>
           </Avatar>
           {!isCollapsed && (
             <div className="ml-3 flex-1 text-left">
               <p className="text-sm font-medium hover:text-black">
-                {user.name}
+                {user?.name || "User"}
               </p>
-              <p className="text-xs text-gray-500">{user.email}</p>
+              {/* <p className="text-xs text-gray-500">
+                {user?.email || "No email"}
+              </p> */}
             </div>
           )}
         </button>
@@ -156,12 +241,14 @@ const SidebarDynamic = ({
         <DropdownMenuLabel>
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>HJ</AvatarFallback>
+              <AvatarImage src={user?.avatar} alt={user?.name || "User"} />
+              <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-sm font-medium">{user.name}</p>
-              <p className="text-xs text-gray-500">{user.email}</p>
+              <p className="text-sm font-medium">{user?.name || "User"}</p>
+              {/* <p className="text-xs text-gray-500">
+                {user?.email || "No email"}
+              </p> */}
             </div>
           </div>
         </DropdownMenuLabel>

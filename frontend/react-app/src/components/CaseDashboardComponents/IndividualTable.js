@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Search } from "lucide-react";
 import {
@@ -17,27 +17,15 @@ import {
   TableCell,
 } from "../ui/table";
 import { Input } from "../ui/input";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "../ui/pagination";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import PDFMarkerModal from "../MainDashboardComponents/PdfMarkerModal";
 import { toast } from "../../hooks/use-toast";
-// import IndividualDashboard from "@/Pages/IndividualDashboard";
+import { useReportContext } from "../../contexts/ReportContext";
 
-const ITEMS_PER_PAGE = 10;
-
-const IndividualTable = ({ caseId,caseName }) => {
+const IndividualTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [statements, setStatements] = useState([]);
 
   // Rerun pdf states
@@ -47,53 +35,52 @@ const IndividualTable = ({ caseId,caseName }) => {
   const [failedDatasOfCurrentReport, setFailedDatasOfCurrentReport] = useState(
     []
   );
-  const [currentCaseName, setCurrentCaseName] = useState("");
+
+  // Use a ref to store the file path being processed
+  const processingFilePathRef = useRef(null);
+  const [processingState, setProcessingState] = useState({});
+
   const navigate = useNavigate();
+  const { reportData, updateReportData } = useReportContext();
+  const { caseId, reportName } = reportData;
+
+  const fetchStatements = async () => {
+    setIsLoading(true);
+    try {
+      const result = await window.electron.getStatements(caseId);
+      console.log({ result });
+      setStatements(result);
+    } catch (error) {
+      console.error("Error fetching statements:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStatements = async () => {
-      setIsLoading(true);
-      try {
-        const result = await window.electron.getStatements(caseId);
-        console.log({result})
-        setStatements(result);
-      } catch (error) {
-        console.error("Error fetching statements:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     if (caseId) {
       fetchStatements();
-      setCurrentCaseName(caseName)
     }
-  }, [caseId,caseName]);
+  }, [caseId]);
 
   const filteredData = statements.filter((item) => {
     const name = item.customerName || "";
     const accountNumber = item.accountNumber || "";
     const filePath = item.filePath || "";
-    const individualId = item.id || "";
-
     return (
       name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       accountNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      filePath.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      individualId.toLowerCase().includes(searchTerm.toLowerCase())
+      filePath.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  const currentData = filteredData;
+
   const handleSaveMarkerData = (data) => {
     // Handle saving marker data here
     console.log("recent reports failed pdf handleSave data:", data);
     setIsMarkerModalOpen(false);
   };
-
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentData = filteredData.slice(
-    startIndex,
-    startIndex + ITEMS_PER_PAGE
-  );
 
   const handleRowClick = async (name, accountNumber, individualId) => {
     setIsLoading(true);
@@ -104,91 +91,90 @@ const IndividualTable = ({ caseId,caseName }) => {
     }
   };
 
-  const handleRectify = (filePath) => {
+  const handleRectify = async (filePath) => {
+    // Update processing state for this specific file path
+    setProcessingState((prev) => ({ ...prev, [filePath]: true }));
+    processingFilePathRef.current = filePath;
+    console.log("filePath", processingFilePathRef.current);
+
     try {
       const selectedFile = statements.find(
         (stmt) => stmt.filePath === filePath
       );
       if (!selectedFile) {
         console.error("File not found in statements list:", filePath);
+        // Reset processing state if file not found
+        setProcessingState((prev) => ({ ...prev, [filePath]: false }));
+        processingFilePathRef.current = null;
         return;
       }
 
-      const startDate =  new Date(selectedFile.startDate).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }).replace(/\//g, "-")
+      const startDate = new Date(selectedFile.startDate)
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+        .replace(/\//g, "-");
 
-
-      const endDate = new Date(selectedFile.endDate).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }).replace(/\//g, "-")
+      const endDate = new Date(selectedFile.endDate)
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+        .replace(/\//g, "-");
 
       const tempSelectedFile = {
-        bankName:selectedFile.bankName,
-        caseId:selectedFile.caseId,
-        createdAt:selectedFile.createdAt,
-        customerName:selectedFile.customerName,
-        path:selectedFile.filePath,
-        id:selectedFile.id,
-        passwords:selectedFile.password,
-        startDate:startDate,
-        endDate:endDate,
-      }
+        bankName: selectedFile.bankName,
+        caseId: selectedFile.caseId,
+        createdAt: selectedFile.createdAt,
+        customerName: selectedFile.customerName,
+        path: selectedFile.filePath,
+        id: selectedFile.id,
+        passwords: selectedFile.password,
+        startDate: startDate,
+        endDate: endDate,
+      };
 
-      console.log("Selected file from DB:", tempSelectedFile);
       setSelectedFailedFile(tempSelectedFile);
       setIsMarkerModalOpen(true);
     } catch (error) {
       console.error("Error handling rectify:", error);
+      // Clear processing state for this file on error
+      setProcessingState((prev) => ({ ...prev, [filePath]: false }));
+      processingFilePathRef.current = null;
     }
   };
 
-  // const handleModalClose = () => {
-  //   setIsMarkerModalOpen(false);
-  //   setSelectedFailedFile(null);
-  // };
-
-  const getPageNumbers = () => {
-    const pageNumbers = [];
-    const maxVisiblePages = 5;
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) {
-          pageNumbers.push(i);
-        }
-        pageNumbers.push("ellipsis");
-        pageNumbers.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pageNumbers.push(1);
-        pageNumbers.push("ellipsis");
-        for (let i = totalPages - 3; i <= totalPages; i++) {
-          pageNumbers.push(i);
-        }
-      } else {
-        pageNumbers.push(1);
-        pageNumbers.push("ellipsis");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pageNumbers.push(i);
-        }
-        pageNumbers.push("ellipsis");
-        pageNumbers.push(totalPages);
-      }
+  // Handle modal close - clear processing state
+  const handleModalClose = () => {
+    setIsMarkerModalOpen(false);
+    // Important: Reset processing state when modal is closed
+    if (processingFilePathRef.current) {
+      setProcessingState((prev) => ({
+        ...prev,
+        [processingFilePathRef.current]: false,
+      }));
+      processingFilePathRef.current = null;
     }
-    return pageNumbers;
+    console.log("processingFilePathRef.current", processingFilePathRef.current);
   };
+  // Add this new function to handle completion
+  const handleProcessingComplete = () => {
+    // First, fetch the updated statements
+    fetchStatements();
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+    // Then, reset the processing state for the current file being processed
+    if (processingFilePathRef.current) {
+      setProcessingState((prev) => ({
+        ...prev,
+        [processingFilePathRef.current]: false,
+      }));
+      processingFilePathRef.current = null;
     }
+    console.log("handle", processingFilePathRef.current);
+    setProcessingState(false);
   };
 
   const handleCombinedDashboardClick = (caseId) => {
@@ -212,7 +198,7 @@ const IndividualTable = ({ caseId,caseName }) => {
               </CardDescription>
             </div>
             <div className="relative flex items-center space-x-4">
-            <Button onClick={() => handleCombinedDashboardClick(caseId)}>
+              <Button onClick={() => handleCombinedDashboardClick(caseId)}>
                 Combined Dashboard
               </Button>
               <div className="relative">
@@ -241,94 +227,70 @@ const IndividualTable = ({ caseId,caseName }) => {
             <TableBody>
               {currentData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
+                  <TableCell colSpan={5} className="text-center">
                     No matching results found
                   </TableCell>
                 </TableRow>
               ) : (
-                currentData.map((item, index) => (
-                  <TableRow
-                    key={index}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() =>
-                      handleRowClick(
-                        item.customerName,
-                        item.accountNumber,
-                        item.id
-                      )
-                    }
-                  >
-                    <TableCell>{startIndex + index + 1}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-row justify-between">
+                currentData.map((item, index) => {
+                  const filePath = item.filePath || "";
+                  const filename = filePath.split("\\").pop(); // Get filename from path
+                  const filenameWithoutTimestamp = filename
+                    ? filename.substring(filename.indexOf("-") + 1)
+                    : "";
+
+                  // Check if this specific row is processing
+                  const isProcessing = processingState[filePath];
+                  console.log("is Processing", isProcessing);
+
+                  return (
+                    <TableRow
+                      key={index}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() =>
+                        handleRowClick(
+                          item.customerName,
+                          item.accountNumber,
+                          item.id
+                        )
+                      }
+                    >
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
                         <div
                           className="truncate max-w-96"
-                          title={item.filePath}
+                          title={filenameWithoutTimestamp}
                         >
-                          {item.filePath.split("\\").pop()}
+                          {filenameWithoutTimestamp}
                         </div>
-                   
-                      </div>
-                    </TableCell>
-                    <TableCell>{item.customerName}</TableCell>
-                    <TableCell>{item.accountNumber}</TableCell>
-                    <TableCell>
-                    <div className="-space-x-2">
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent row click
-                              handleRectify(item.filePath);
-                            }}
-                          >
-                            Re-run
-                          </Button>
-                        </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell>{item.customerName}</TableCell>
+                      <TableCell>{item.accountNumber}</TableCell>
+                      <TableCell>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click
+                            handleRectify(item.filePath);
+                          }}
+                          disabled={isProcessing}
+                        >
+                          {isProcessing ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              <span>Processing...</span>
+                            </>
+                          ) : (
+                            "Re-run"
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    className={cn(
-                      "cursor-pointer",
-                      currentPage === 1 && "pointer-events-none opacity-50"
-                    )}
-                  />
-                </PaginationItem>
-                {getPageNumbers().map((pageNumber, index) => (
-                  <PaginationItem key={index}>
-                    {pageNumber === "ellipsis" ? (
-                      <PaginationEllipsis />
-                    ) : (
-                      <PaginationLink
-                        onClick={() => handlePageChange(pageNumber)}
-                        isActive={currentPage === pageNumber}
-                        className="cursor-pointer"
-                      >
-                        {pageNumber}
-                      </PaginationLink>
-                    )}
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    className={cn(
-                      "cursor-pointer",
-                      currentPage === totalPages &&
-                        "pointer-events-none opacity-50"
-                    )}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+          {/* Removed Pagination Component */}
         </CardContent>
       </Card>
 
@@ -338,8 +300,8 @@ const IndividualTable = ({ caseId,caseName }) => {
         source={"indiviualDashboard"}
         setFailedDatasOfCurrentReport={setFailedDatasOfCurrentReport}
         failedDatasOfCurrentReport={failedDatasOfCurrentReport}
-        currentCaseName={currentCaseName}
-        onClose={()=>setIsMarkerModalOpen(false)}
+        onClose={handleModalClose}
+        onProcessingComplete={handleProcessingComplete}
       />
 
       {isLoading && (

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { useState, useEffect } from "react";
 import BarLineChart from "../charts/BarLineChart";
 import UnifiedTable from "./UnifiedTable";
 import { useParams } from "react-router-dom";
 import ToggleStrip from "./ToggleStrip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 
 const Upi = () => {
   const [upiCrData, setUpiCrData] = useState([]);
@@ -11,15 +11,17 @@ const Upi = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { caseId, individualId } = useParams();
-  const [availableMonthsCr, setAvailableMonthsCr] = useState([]);
-  const [selectedMonthsCr, setSelectedMonthsCr] = useState([]);
   const [availableMonthsDr, setAvailableMonthsDr] = useState([]);
+  const [availableMonthsCr, setAvailableMonthsCr] = useState([]);
   const [selectedMonthsDr, setSelectedMonthsDr] = useState([]);
+  const [selectedMonthsCr, setSelectedMonthsCr] = useState([]);
 
   // Helper function to get month key
   const getMonthKey = (dateString) => {
     const date = new Date(dateString);
-    return `${date.toLocaleString("en-GB", { month: "short" })}-${date.getFullYear()}`;
+    return `${date.toLocaleString("en-GB", {
+      month: "short",
+    })}-${date.getFullYear()}`;
   };
 
   // Helper function to parse month string to Date
@@ -33,11 +35,11 @@ const Upi = () => {
     try {
       const crResponse = await window.electron.getTransactionsByUpiCr(
         caseId,
-        parseInt(individualId)
+        Number.parseInt(individualId)
       );
       const drResponse = await window.electron.getTransactionsByUpiDr(
         caseId,
-        parseInt(individualId)
+        Number.parseInt(individualId)
       );
 
       // Transform UPI-Cr data
@@ -47,13 +49,13 @@ const Upi = () => {
           month: "2-digit",
           year: "numeric",
         }),
-        Description: item.description,
-        Credit: item.amount || 0,
-        Balance: item.balance || 0,
-        category: item.category || '-',
-        entity: item.entity || '-',
+        description: item.description,
+        credit: item.amount || 0,
+        balance: item.balance || 0,
+        category: item.category || "-",
+        monthKey: getMonthKey(item.date),
+        entity: item.entity || "-",
         id: item.id,
-        monthKey: getMonthKey(item.date)
       }));
 
       // Transform UPI-Dr data
@@ -63,28 +65,36 @@ const Upi = () => {
           month: "2-digit",
           year: "numeric",
         }),
-        Description: item.description,
-        Debit: Math.abs(item.amount) || 0,
-        Balance: item.balance || 0,
-        category: item.category || '-',
-        entity: item.entity || '-',
+        description: item.description,
+        debit: Math.abs(item.amount) || 0, // Ensure positive value
+        balance: item.balance || 0,
+        category: item.category || "-",
+        monthKey: getMonthKey(item.date),
+        entity: item.entity || "-",
         transactionId: item.id,
-        monthKey: getMonthKey(item.date)
       }));
 
-      // Get unique months for both Cr and Dr transactions
-      const uniqueMonthsCr = [...new Set(transformedUpiCrData.map(item => item.monthKey))]
-        .sort((a, b) => getMonthDate(a) - getMonthDate(b));
-      const uniqueMonthsDr = [...new Set(transformedUpiDrData.map(item => item.monthKey))]
-        .sort((a, b) => getMonthDate(a) - getMonthDate(b));
+      const uniqueMonthsDr = [
+        ...new Set(transformedUpiDrData.map((item) => item.monthKey)),
+      ].sort((a, b) => {
+        const dateA = getMonthDate(a);
+        const dateB = getMonthDate(b);
+        return dateA - dateB;
+      });
+      const uniqueMonthsCr = [
+        ...new Set(transformedUpiCrData.map((item) => item.monthKey)),
+      ].sort((a, b) => {
+        const dateA = getMonthDate(a);
+        const dateB = getMonthDate(b);
+        return dateA - dateB;
+      });
 
-      setUpiCrData(transformedUpiCrData);
       setAvailableMonthsCr(uniqueMonthsCr);
-      setSelectedMonthsCr(uniqueMonthsCr);
-      
-      setUpiDrData(transformedUpiDrData);
       setAvailableMonthsDr(uniqueMonthsDr);
+      setSelectedMonthsCr(uniqueMonthsCr);
       setSelectedMonthsDr(uniqueMonthsDr);
+      setUpiCrData(transformedUpiCrData);
+      setUpiDrData(transformedUpiDrData);
       setIsLoading(false);
     } catch (err) {
       console.error("Error fetching UPI transactions:", err);
@@ -94,19 +104,8 @@ const Upi = () => {
   };
 
   useEffect(() => {
-  
-
     fetchData();
   }, [caseId, individualId]);
-
-  // Filter data based on selected months
-  const filteredCrData = upiCrData.filter(item => 
-    selectedMonthsCr.includes(item.monthKey)
-  );
-
-  const filteredDrData = upiDrData.filter(item => 
-    selectedMonthsDr.includes(item.monthKey)
-  );
 
   const chartConfig = {
     yAxis: {
@@ -146,10 +145,60 @@ const Upi = () => {
     );
   }
 
+  const filteredUpiCrData = upiCrData.filter((item) =>
+    selectedMonthsCr.includes(item.monthKey)
+  );
+
+  // Transform data for chart to show monthly aggregates
+  const getCrChartData = () => {
+    const monthlyData = {};
+
+    filteredUpiCrData.forEach((item) => {
+      if (!monthlyData[item.monthKey]) {
+        monthlyData[item.monthKey] = {
+          date: item.monthKey, // Using monthKey as date for x-axis
+          credit: 0,
+        };
+      }
+      monthlyData[item.monthKey].credit += item.credit;
+    });
+
+    return Object.values(monthlyData).sort((a, b) => {
+      const dateA = getMonthDate(a.date);
+      const dateB = getMonthDate(b.date);
+      return dateA - dateB;
+    });
+  };
+
+  const filteredUpiDrData = upiDrData.filter((item) =>
+    selectedMonthsDr.includes(item.monthKey)
+  );
+
+  // Transform data for chart to show monthly aggregates
+  const getDrChartData = () => {
+    const monthlyData = {};
+
+    filteredUpiDrData.forEach((item) => {
+      if (!monthlyData[item.monthKey]) {
+        monthlyData[item.monthKey] = {
+          date: item.monthKey, // Using monthKey as date for x-axis
+          debit: 0,
+        };
+      }
+      monthlyData[item.monthKey].debit += item.debit;
+    });
+
+    return Object.values(monthlyData).sort((a, b) => {
+      const dateA = getMonthDate(a.date);
+      const dateB = getMonthDate(b.date);
+      return dateA - dateB;
+    });
+  };
+
   return (
-    <div className="rounded-xl shadow-sm m-8 mt-2 space-y-6">
+    <div className="rounded-xl m-8 mt-2 space-y-6">
       <Tabs defaultValue="upi-cr">
-        <TabsList className="grid w-[500px] grid-cols-2 pb-10 mb-4">
+        <TabsList className="grid w-[500px] grid-cols-2 pb-10">
           <TabsTrigger value="upi-cr">UPI-Cr</TabsTrigger>
           <TabsTrigger value="upi-dr">UPI-Dr</TabsTrigger>
         </TabsList>
@@ -158,7 +207,7 @@ const Upi = () => {
           {upiCrData.length === 0 ? (
             <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
               <p className="text-gray-800 text-center mt-3 font-medium text-lg">
-                No Data Available
+                No UPI Credit Data Available
               </p>
             </div>
           ) : (
@@ -171,21 +220,22 @@ const Upi = () => {
 
               {selectedMonthsCr.length === 0 ? (
                 <div className="text-center text-gray-600 dark:text-gray-400 my-6">
-                  Select months to display the graphs
+                  Select months to view data
                 </div>
               ) : (
                 <>
-                  <div className="mb-6 w-full h-[60vh] mt-6">
+                  <div className="mb-6 mt-4 w-full h-[60vh]">
                     <BarLineChart
-                      data={filteredCrData}
+                      data={getCrChartData()}
                       xAxisKey="date"
                       columnTypes={columnTypes}
                       config={chartConfig}
                     />
                   </div>
-                  <div>
-                    <UnifiedTable data={filteredCrData} title="UPI Credit Transactions" 
-                    caseId={caseId} refreshFunction={fetchData}
+                  <div className="w-full">
+                    <UnifiedTable
+                      data={filteredUpiCrData}
+                      title="UPI Credit Transactions"
                     />
                   </div>
                 </>
@@ -198,7 +248,7 @@ const Upi = () => {
           {upiDrData.length === 0 ? (
             <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
               <p className="text-gray-800 text-center mt-3 font-medium text-lg">
-                No Data Available
+                No UPI Debit Data Available
               </p>
             </div>
           ) : (
@@ -208,24 +258,24 @@ const Upi = () => {
                 selectedColumns={selectedMonthsDr}
                 setSelectedColumns={setSelectedMonthsDr}
               />
-
               {selectedMonthsDr.length === 0 ? (
                 <div className="text-center text-gray-600 dark:text-gray-400 my-6">
-                  Select months to display the graphs
+                  Select months to view data
                 </div>
               ) : (
                 <>
-                  <div className="mb-6 w-full h-[60vh] mt-6">
+                  <div className="mb-6 w-full h-[60vh]">
                     <BarLineChart
-                      data={filteredDrData}
+                      data={getDrChartData()}
                       xAxisKey="date"
                       columnTypes={columnTypes}
                       config={chartConfig}
                     />
                   </div>
-                  <div>
-                    <UnifiedTable data={filteredDrData} title="UPI Debit Transactions" 
-                    caseId={caseId} refreshFunction={fetchData}
+                  <div className="w-full">
+                    <UnifiedTable
+                      data={filteredUpiDrData}
+                      title="UPI Debit Transactions"
                     />
                   </div>
                 </>

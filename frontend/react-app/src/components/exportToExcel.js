@@ -11,9 +11,16 @@ const getExcelColumnLetter = (colIndex) => {
   return letter;
 };
 
-const exportToExcel = async (transactions, fileName = "transactions.xlsx", forShare = false, categoryOptions = null) => {
+const exportToExcel = async (
+  transactions,
+  fileName = "transactions.xlsx",
+  forShare = false,
+  categoryOptions = null
+) => {
   const columnsToIgnore = ["monthKey"];
   const colsToHide = ["id"];
+
+  console.log({ transactions, fileName, forShare, categoryOptions });
 
   if (!transactions.length) return null;
 
@@ -41,12 +48,38 @@ const exportToExcel = async (transactions, fileName = "transactions.xlsx", forSh
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Transactions");
 
+  let headers = [];
+
   // Define headers
-  const headers = Object.keys(finalTransactions[0]);
-  sheet.columns = headers.map((header) => ({
-    header: header.charAt(0).toUpperCase() + header.slice(1),
-    key: header,
-  }));
+  if(categoryOptions){
+    headers = [Object.keys(finalTransactions[0]),"classification"].flat();
+  }else{
+    headers = Object.keys(finalTransactions[0]);
+  }
+
+  sheet.columns = headers.map((header) => {
+    const column = {
+      header: header.charAt(0).toUpperCase() + header.slice(1),
+      key: header,
+      width: 12, // default width for columns
+    };
+
+    // Set specific widths for certain columns
+    if (header === "description") {
+      column.width = 70; // wider width for description column
+    } else if (header === "entity") {
+      column.width = 20;
+    } else if (header === "category"||header==="classification") {
+      column.width = 20;
+    } else if (header === "debit" || header === "credit" || header === "balance") {
+      column.width = 15;
+    }else if(header === "Statement Name" || header==="Report Name"||header==="Home Loan Amount (₹)"||header==="LAP Amount (₹)"||header==="Business Loan Amount (₹)"||header==="Term Plan Amount (₹)"||header==="General Insurance Amount (₹)"||header==="Home Loan Commission (₹)"||header==="LAP Commission (₹)"||header==="Business Loan Commission (₹)"||header==="Term Plan Commission (₹)"||header==="General Insurance Commission (₹)" ){
+      column.width = 20;
+    }
+
+
+    return column;
+  });
 
   // Add data rows
   finalTransactions.forEach((row) => sheet.addRow(row));
@@ -56,16 +89,66 @@ const exportToExcel = async (transactions, fileName = "transactions.xlsx", forSh
     if (colsToHide.includes(header)) {
       sheet.getColumn(index + 1).hidden = true;
     }
+
+
+    const cell = sheet.getRow(1).getCell(index + 1);
+
+    // Center align all cells in the header row
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+
+    // Apply background color to header row
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF000058" }
+    };
+
+    // Apply font style to header row
+    cell.font = {
+      name: 'Calibri',
+      size: 11,
+      color: { argb: "FFFFFFFF" },
+      bold: true
+    };
+
+    // Apply color to alternate rows except header row
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1 && rowNumber % 2 !== 0) {  // Skip header row (1) and apply to odd rows
+      row.eachCell((cell) => {
+        cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFB5CBE0" }
+        };
+      });
+      }
+    });
+
   });
 
   // ✅ Apply category dropdown if `categoryOptions` is provided
   if (categoryOptions && headers.includes("category")) {
     const categoryColIndex = headers.indexOf("category");
+    const classificationIndex = categoryColIndex+1;
     const categoryColLetter = getExcelColumnLetter(categoryColIndex);
+    const classificationColLetter = getExcelColumnLetter(classificationIndex);
     const numRows = finalTransactions.length;
 
     // Add a "Categories" sheet with category options
-    const categorySheet = workbook.addWorksheet("Categories",{state:'hidden'});
+    const categorySheet = workbook.addWorksheet("Categories", {
+      state: "hidden",
+    });
+
+    const classificationSheet = workbook.addWorksheet("Classification", {
+      state: "hidden",
+    });
+
+    const classificationOptions = ["Income", "Important Expenses / Payments", "Other Expenses / Payments", "Contra"];
+
+    classificationOptions.forEach((cat, i) => {
+      classificationSheet.getCell(`A${i + 1}`).value = cat;
+    });
+
     categoryOptions.forEach((cat, i) => {
       categorySheet.getCell(`A${i + 1}`).value = cat;
     });
@@ -78,7 +161,17 @@ const exportToExcel = async (transactions, fileName = "transactions.xlsx", forSh
         formulae: [`'Categories'!$A$1:$A$${categoryOptions.length}`], // Reference to category sheet
       };
     }
+
+    // Apply dropdown validation to the "Classification" column
+    for (let i = 2; i <= numRows + 1; i++) {
+      sheet.getCell(`${classificationColLetter}${i}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`'Classification'!$A$1:$A$${classificationOptions.length}`], // Reference to category sheet
+      };
+    }
   }
+
 
   // Save the file
   const buffer = await workbook.xlsx.writeBuffer();
@@ -99,7 +192,8 @@ const exportToExcel = async (transactions, fileName = "transactions.xlsx", forSh
             {
               description: "Excel File",
               accept: {
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                  [".xlsx"],
               },
             },
           ],

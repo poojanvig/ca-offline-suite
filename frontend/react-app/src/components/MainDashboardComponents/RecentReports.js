@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   XCircle,
   Download,
+  Upload,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -62,6 +63,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "../ui/dialog"; // Import shadcn/ui Dialog components
 import {
   Tooltip,
@@ -70,9 +72,17 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { Checkbox } from "../ui/checkbox";
-
+import { useReportContext } from "../../contexts/ReportContext";
 import PDFMarkerModal from "./PdfMarkerModal";
 import { useLoading } from "../../contexts/LoadingContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { exportToExcel } from "../exportToExcel";
+import * as XLSX from "xlsx";
 
 const RecentReportsComp = ({ key, onReportGenerated }) => {
   const { toast } = useToast();
@@ -85,7 +95,6 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
   const itemsPerPage = 10;
   const [currentCaseName, setCurrentCaseName] = useState("");
   const [currentCaseId, setCurrentCaseId] = useState("");
-  const [recentReports, setRecentReports] = useState([]);
   const [failedDatasOfCurrentReport, setFailedDatasOfCurrentReport] = useState(
     []
   );
@@ -101,9 +110,16 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
   const [dialogOpen, setDialogOpen] = useState(false); // State to control Dialog visibility
   const [isChecked, setIsChecked] = useState(false);
   const { setIsExcelLoading } = useLoading();
+  const { reportData, updateReportData } = useReportContext();
+  const fileInputRef = useRef(null);
+  const [uploadedChanges, setUploadedChanges] = useState({});
+  const [categoryUpdateModalOpen, setCategoryUpdateModalOpen] = useState(false);
+  const [isRectifyAlertOpen, setIsRectifyAlertOpen] = useState(false);
+  const [isHandleDetailsDialogOpen,setIsHandleDetailsDialogOpen] = useState(null);
 
   const handleSubmitEditPdf = async () => {
     setPdfEditLoading(true);
+
     const allRectified = failedDatasOfCurrentReport.every(
       (statement) => statement.resolved
     );
@@ -116,7 +132,10 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
       );
       console.log("result", result);
 
-      if (result.success && result.data.failedStatements.length === 0) {
+      if (
+        result.success &&
+        result.data.failedStatements.bank_names.length === 0
+      ) {
         toast({
           title: "Success",
           description: "All statements have been rectified.",
@@ -124,6 +143,30 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
           className: "bg-white text-black opacity-100 shadow-lg",
         });
         setPdfEditLoading(false);
+
+        const updatedRecentReportsData = reportData.recentReportsData.map(
+          (report) => {
+            console.log("makwana:", report); // Print report ID
+            console.log("Report ID:", report.id); // Print report ID
+            console.log("Current Case ID:", result.data.caseId); // Print currentCaseId
+            if (report.id === result.data.caseId) {
+              return {
+                ...report,
+                name: currentCaseName,
+                status: "Success",
+              };
+            }
+            return report;
+          }
+        );
+        console.log("updatedRecentReportsData", updatedRecentReportsData);
+        updateReportData({ 
+          ...reportData, // Preserve other reportData properties
+          recentReportsData: updatedRecentReportsData 
+        });
+        
+        console.log("saas", reportData.recentReportsData);
+
       } else {
         // If the rectification failed, show error message and reasons
         const unrectifiedStatements = failedDatasOfCurrentReport.filter(
@@ -161,6 +204,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
       });
     }
     setPdfEditLoading(false);
+    localStorage.removeItem("dashboardData");
   };
 
   const handleRectify = () => {
@@ -175,6 +219,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
 
   useEffect(() => {
     const fetchReports = async () => {
+      setIsLoading(true);
       try {
         const result = await window.electron.getRecentReports();
         console.log({ recentReports: result });
@@ -200,7 +245,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
             })),
           }));
 
-        setRecentReports(formattedReports);
+        updateReportData({ recentReportsData: formattedReports });
       } catch (error) {
         toast({
           title: "Error",
@@ -212,13 +257,13 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
       }
     };
 
-    console.log({ setShowRectifyButton, setFailedStatements, setDialogOpen });
-
-    fetchReports();
+    if (reportData.recentReportsData.length === 0) {
+      fetchReports();
+    }
   }, []);
 
   // Filter reports based on search query
-  const filteredReports = recentReports.filter(
+  const filteredReports = reportData.recentReportsData.filter(
     (report) =>
       report.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -296,9 +341,11 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
   const handleDeleteReport = async (reportId) => {
     try {
       await window.electron.deleteReport(reportId);
-      setRecentReports((prev) =>
-        prev.filter((report) => report.id !== reportId)
+
+      const updatedReports = reportData.recentReportsData.filter(
+        (report) => report.id !== reportId
       );
+      updateReportData({ recentReportsData: updatedReports });
 
       toast({
         title: "Success",
@@ -316,6 +363,8 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
         }`,
         variant: "destructive",
       });
+    } finally {
+      localStorage.removeItem("dashboardData");
     }
   };
 
@@ -609,6 +658,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
       setLoading(false);
       progressIntervalRef.current = null;
       setIsAddPdfModalOpen(false);
+      localStorage.removeItem("dashboardData");
     }
   };
   const toggleEdit = (id) => {
@@ -625,11 +675,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
     setIsAddPdfModalOpen(false);
   };
 
-  const handleSaveMarkerData = (data) => {
-    // Handle saving marker data here
-    console.log("recent reports failed pdf handleSave data:", data);
-    setIsMarkerModalOpen(false);
-  };
+
   // Function to handle opening the modal and fetching the failed statements
   const handleDetails = async (reportId, reportName) => {
     setIsLoading(true);
@@ -701,7 +747,12 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
         setFailedDatasOfCurrentReport([]);
         return;
       }
-
+      if(processedFailedData.length === 0) {
+        console.warn("No valid failed statement data found after processing.");
+        setFailedDatasOfCurrentReport([]);
+        setShowRectifyButton(false);
+        return;
+      }
       // Extract first valid failed statement (assuming one caseId per report)
       const firstFailedEntry = processedFailedData[0];
       console.log({ processedFailedData, firstFailedEntry });
@@ -737,6 +788,8 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
           index === self.findIndex((t) => t.pdfName === item.pdfName)
       );
 
+      console.log("Unique failed data for shubh:", uniqueFailedDataOfReport);
+      setIsHandleDetailsDialogOpen(reportId);
       setFailedDatasOfCurrentReport(uniqueFailedDataOfReport);
     } catch (error) {
       console.error("Error fetching failed statements:", error);
@@ -748,8 +801,22 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
       });
     } finally {
       setIsLoading(false);
+      updateReportData({
+        triggerRectify: { caseId: null, caseName: null },
+      });
+
     }
   };
+
+  useEffect(() => {
+    console.log({triggeredRectify:reportData})
+    if(reportData.triggerRectify.caseId&&reportData.triggerRectify.caseName){
+    handleDetails(
+      reportData?.triggerRectify?.caseId,
+      reportData?.triggerRectify?.caseName
+    );
+  }
+}, [reportData.triggerRectify]);
 
   const handleDownload = async (caseid, status) => {
     if (status === "Pending") {
@@ -836,6 +903,197 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
     }
   };
 
+  const processSuspenseData = (transactions) => {
+    return transactions.map((transaction) => ({
+      date: new Date(transaction.date).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+      description: transaction.description,
+      credit:
+        transaction.type.toLowerCase() === "credit" ? transaction.amount : 0,
+      debit:
+        transaction.type.toLowerCase() === "debit" ? transaction.amount : 0,
+      balance: transaction.balance,
+      category: transaction.category,
+      id: transaction.id,
+    }));
+  };
+
+  const fetchSuspenseData = async (caseId) => {
+    try {
+      const suspenseTransactionaAll =
+        await window.electron.getTransactionsBySuspense(caseId, null);
+
+      console.log("suspenseTransactionaAll", suspenseTransactionaAll);
+
+      const transformedSuspenseData = processSuspenseData(
+        suspenseTransactionaAll
+      );
+
+      console.log("transformedSuspenseData", transformedSuspenseData);
+
+      return transformedSuspenseData;
+
+      // Initially select all months
+    } catch (error) {
+      console.error("Error fetching suspense transactions:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSuspenseDownload = async (caseId, caseName) => {
+    const suspenseData = await fetchSuspenseData(caseId);
+
+    let newTitle = `${caseName} Suspense Transactions.xlsx`;
+
+    exportToExcel(suspenseData, newTitle, false, reportData.categoryOptions);
+
+    console.log({ suspenseData });
+  };
+  const handleSummaryDownload = () => {};
+
+  const handleExcelFileUpload = async (event, caseId) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    console.log({ caseId, event });
+
+    const suspenseData = await fetchSuspenseData(caseId);
+
+    console.log("Suspense Data: ", suspenseData);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const parsedData = XLSX.utils.sheet_to_json(sheet);
+
+      console.log("Uploaded Suspense Data: ", parsedData);
+
+      // Extract modified categories and compare with existing data
+      const updates = parsedData
+        .map((row) => {
+          const existingTransaction = suspenseData.find(
+            (tx) => tx.id === row.Id
+          );
+          if (!existingTransaction) return null;
+          if (existingTransaction.category === row.Category) return null;
+
+          return {
+            date: row.Date,
+            credit: row.Credit,
+            debit: row.Debit,
+            description: row.Description,
+            id: row.Id,
+            oldCategory: existingTransaction.category,
+            newCategory: row.Category,
+          };
+        })
+        .filter(Boolean); // Remove nulls
+
+      console.log({ updates });
+      // Store updates and show confirmation modal
+      setUploadedChanges({ updates, suspenseData, caseId });
+      setCategoryUpdateModalOpen(true);
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  const convertArrayToObject = (array) => {
+    return array.reduce((acc, transaction) => {
+      const id = transaction.id;
+      if (id) {
+        acc[Number(id)] = transaction;
+      }
+      return acc;
+    }, {});
+  };
+
+  const applyUploadedCategoryChanges = async () => {
+    // Suspense excel upload handle
+    try {
+      console.log("Applying category updates:", uploadedChanges);
+      const suspenseTransactions = uploadedChanges.suspenseData;
+      const uploadedData = uploadedChanges.updates;
+
+      // Call API or Electron IPC to update database
+      // await window.electron.updateSuspenseCategories(uploadedChanges);
+
+      // TODO - Apply changes locally in the table
+
+      const updatedTransactions = uploadedData.map((change) => {
+        const updatedTransaction = suspenseTransactions.find(
+          (tx) => tx.id === change.id
+        );
+        if (updatedTransaction) {
+          updatedTransaction.oldCategory = change.oldCategory;
+          updatedTransaction.category = change.newCategory;
+          updatedTransaction.reasoning = "";
+        }
+        return updatedTransaction;
+      });
+
+      console.log("Updated Transactions", updatedTransactions);
+
+      const payload = convertArrayToObject(updatedTransactions);
+      console.log("Payload", payload);
+      const response = await window.electron.editCategory(
+        payload,
+        uploadedChanges.caseId
+      );
+      console.log({ response });
+      setCategoryUpdateModalOpen(false);
+      setUploadedChanges({});
+      toast({
+        title: "Categories Updated!",
+        description: "Suspense transactions have been updated successfully.",
+      });
+      // if (refreshFunction) refreshFunction();
+    } catch (error) {
+      console.error("Error updating categories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update categories. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUploadClick = (reportId) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx, .xls";
+    input.onchange = (e) => handleExcelFileUpload(e, reportId);
+    input.click();
+  };
+
+
+  const isHandleDetailsOpenForThisId=(id)=>{
+    if(!id) return null
+    if(isHandleDetailsDialogOpen===id){
+      console.log("Aiyaz  Handle details open for id ", id)
+    }
+    return isHandleDetailsDialogOpen===id
+  }
+
+  const handleChangeForHandleDetails = (id)=>{
+    if(isHandleDetailsDialogOpen===id){
+      console.log("Aiyaz  Setting handle details as null")
+      setIsHandleDetailsDialogOpen(null)
+    }else{
+      console.log("Aiyaz Setting handle details as ", id)
+
+      setIsHandleDetailsDialogOpen(id)
+
+    }
+  }
+
   return (
     <Card>
       <PDFMarkerModal
@@ -856,7 +1114,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
           <div>
             <CardTitle>Recent Reports</CardTitle>
             <CardDescription className="py-3">
-              A list of recent reports from all projects
+              A list of recent reports
             </CardDescription>
           </div>
           <div className="relative">
@@ -871,7 +1129,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
         </div>
       </CardHeader>
       <CardContent>
-        {recentReports.length > 0 ? (
+        {reportData.recentReportsData.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow className="align-">
@@ -986,14 +1244,64 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+
+                        <DropdownMenu>
+                          <Tooltip>
+                            <DropdownMenuTrigger asChild>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className={cn(
+                                    "h-8 w-8",
+                                    report.status === "In Progress" &&
+                                      "opacity-50 cursor-not-allowed"
+                                  )}
+                                  disabled={report.status === "In Progress"}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                            </DropdownMenuTrigger>
+                            <TooltipContent>
+                              {report.status === "Pending"
+                                ? "Download not available while processing"
+                                : "Download Excel"}
+                            </TooltipContent>
+                          </Tooltip>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={() =>
+                                handleDownload(report.id, report.status)
+                              }
+                            >
+                              Download Report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={() =>
+                                handleSuspenseDownload(report.id, report.name)
+                              }
+                            >
+                              Download Suspense
+                            </DropdownMenuItem>
+                            {/* <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleSummaryDownload(report.id)}
+                              >
+                                Download Summary
+                              </DropdownMenuItem> */}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Upload Button */}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="outline"
                               size="icon"
-                              onClick={() =>
-                                handleDownload(report.id, report.status)
-                              }
+                              onClick={() => handleUploadClick(report.id)}
                               className={cn(
                                 "h-8 w-8",
                                 report.status === "In Progress" &&
@@ -1001,19 +1309,20 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                               )}
                               disabled={report.status === "In Progress"}
                             >
-                              <Download className="h-4 w-4" />
+                              <Upload className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {report.status === "Pending"
-                              ? "Download not available while processing"
-                              : "Download Excel"}
+                            Upload Modified Suspense
                           </TooltipContent>
                         </Tooltip>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <AlertDialog>
+                      <AlertDialog open={isHandleDetailsOpenForThisId(report.id)}
+                      onOpenChange={()=>handleChangeForHandleDetails(report.id)}
+                      
+                      >
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <AlertDialogTrigger asChild>
@@ -1040,8 +1349,22 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                             </AlertDialogTitle>
                           </AlertDialogHeader>
                           <div className="p-6 overflow-auto max-h-[400px]">
-                            {failedDatasOfCurrentReport &&
-                            failedDatasOfCurrentReport.length > 0 ? (
+                            {!failedDatasOfCurrentReport ? (
+                              <div className="text-center py-4">
+                                <Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-400" />
+                                <p className="text-gray-600 mt-2">
+                                  Loading report details...
+                                </p>
+                              </div>
+                            ) : failedDatasOfCurrentReport.length === 0 &&
+                              !report.hasFailedStatements ? (
+                              <div className="text-center py-4">
+                                <div className="text-green-600 font-semibold mb-2">
+                                  Report Processed Successfully
+                                </div>
+                                <CheckCircle className="w-8 h-8 text-green-600 mx-auto" />
+                              </div>
+                            ) : (
                               <div>
                                 {[...failedDatasOfCurrentReport]
                                   .sort((a, b) => {
@@ -1065,8 +1388,10 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
 
                                     return (
                                       <div
-                                        key={index}
-                                        className="mb-4 border-b pb-4"
+                                        key={`statement-${
+                                          statement.id || index
+                                        }`}
+                                        className="mb-4 border-b pb-4 last:border-b-0"
                                       >
                                         <h3 className="font-semibold mb-2">
                                           Failed Statement {index + 1}
@@ -1074,16 +1399,22 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                                         <div className="flex gap-2 items-center">
                                           <p className="flex-[4.5]">
                                             <strong>File Name:</strong>{" "}
-                                            {statement.pdfName}
+                                            {statement.pdfName
+                                              ? statement.pdfName.substring(
+                                                  statement.pdfName.indexOf(
+                                                    "-"
+                                                  ) + 1
+                                                )
+                                              : ""}
                                           </p>
-                                          {/* Only show button if there's no error and the statement isn't done */}
                                           {!hasError && (
-                                            <>
-                                              {isDone ? (
+                                            <div className="flex-1">
+                                              {report.status === "Success" ||
+                                              isDone ? (
                                                 <Button
                                                   size="sm"
                                                   disabled
-                                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white transition-colors"
+                                                  className="w-full bg-green-600 hover:bg-green-700 text-white transition-colors"
                                                 >
                                                   <CheckCircle className="w-4 h-4 mr-2" />
                                                   Done
@@ -1092,14 +1423,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                                                 <Button
                                                   variant="secondary"
                                                   size="sm"
-                                                  disabled={
-                                                    report.status === "Success"
-                                                  }
-                                                  className={`${
-                                                    report.status === "Success"
-                                                      ? "bg-green-600 hover:bg-green-700 text-white"
-                                                      : "flex-1 hover:bg-primary hover:text-primary-foreground transition-colors"
-                                                  }`}
+                                                  className="w-full hover:bg-primary hover:text-primary-foreground transition-colors"
                                                   onClick={() => {
                                                     setIsMarkerModalOpen(true);
                                                     setSelectedFailedFile(
@@ -1107,16 +1431,10 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                                                     );
                                                   }}
                                                 >
-                                                  {report.status ===
-                                                  "Success" ? (
-                                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                                  ) : (
-                                                    ""
-                                                  )}
                                                   Rectify
                                                 </Button>
                                               )}
-                                            </>
+                                            </div>
                                           )}
                                         </div>
                                         {hasError && (
@@ -1127,34 +1445,25 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                                                 statement.respectiveReasonsForError
                                               }
                                             </p>
-                                            {
-                                              <p className="text-red-500 text-xs mt-1">
-                                                {statement.respectiveReasonsForError
-                                                  .toLowerCase()
-                                                  .includes(
-                                                    "start and end date"
-                                                  )
-                                                  ? "Please Re-run this statement with correct dates."
-                                                  : "Please contact sales for assistance with this issue."}
-                                              </p>
-                                            }
+                                            <p className="text-red-500 text-xs mt-1">
+                                              {statement.respectiveReasonsForError
+                                                .toLowerCase()
+                                                .includes("start and end date")
+                                                ? "Please Re-run this statement with correct dates."
+                                                : "Please contact sales for assistance with this issue."}
+                                            </p>
                                           </div>
                                         )}
                                       </div>
                                     );
                                   })}
                               </div>
-                            ) : (
-                              <div className="text-center text-green-600 font-semibold">
-                                Report Processed Successfully
-                              </div>
                             )}
                           </div>
                           <AlertDialogFooter className="border-t border-black/10 pt-6">
-                            {/* create a submit button */}
-                            {failedDatasOfCurrentReport &&
-                              failedDatasOfCurrentReport.length > 0 && (
-                                <div className="flex justify-center ">
+                            {failedDatasOfCurrentReport?.length > 0 &&
+                              !report.resolved && (
+                                <div className="flex justify-center">
                                   {report.status === "Success" ? (
                                     ""
                                   ) : (
@@ -1176,8 +1485,7 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
                                   )}
                                 </div>
                               )}
-
-                            <AlertDialogCancel className="px-8 bg-black text-white hover:bg-black/90 hover:text-white dark:bg-white dark:text-black">
+                            <AlertDialogCancel onClick={()=>setIsHandleDetailsDialogOpen(null)} className="px-8 bg-black text-white hover:bg-black/90 hover:text-white dark:bg-white dark:text-black">
                               Close
                             </AlertDialogCancel>
                           </AlertDialogFooter>
@@ -1189,11 +1497,15 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
               ))}
             </TableBody>
           </Table>
-        ) : (
-          <div className="text-center text-grey-600 opacity-70 font-semibold">
+        ) : isLoading ? (
+          <div className="flex justify-center items-center w-full text-grey-600 opacity-70 font-semibold">
+            <Loader2 />
+          </div>
+        ) : reportData.recentReportsData.length === 0 ? (
+          <div className="flex justify-center items-center w-full text-grey-600 opacity-70 font-semibold">
             No Reports Found
           </div>
-        )}
+        ) : null}
         {totalPages > 1 && (
           <div className="mt-6">
             <Pagination>
@@ -1310,6 +1622,71 @@ const RecentReportsComp = ({ key, onReportGenerated }) => {
               </Button>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Category Update Confirmation Modal */}
+      <Dialog
+        open={categoryUpdateModalOpen}
+        onOpenChange={setCategoryUpdateModalOpen}
+      >
+        <DialogContent className="max-w-[80%]">
+          <DialogHeader>
+            <DialogTitle>Confirm Category Updates</DialogTitle>
+            <DialogDescription>
+              You are about to update the categories for{" "}
+              {uploadedChanges?.updates?.length} transactions. Please review the
+              changes before proceeding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[400px] overflow-y-auto border p-2 rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Credit</TableHead>
+                  <TableHead>Debit</TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    Old Category
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">
+                    New Category
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {uploadedChanges?.updates?.map((change) => (
+                  <TableRow key={change.id}>
+                    <TableCell>{change.date}</TableCell>
+                    <TableCell>{change.description}</TableCell>
+                    <TableCell>{change.credit}</TableCell>
+                    <TableCell>{change.debit}</TableCell>
+                    <TableCell>{change.oldCategory}</TableCell>
+                    <TableCell className="text-blue-600">
+                      {change.newCategory}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCategoryUpdateModalOpen(false);
+                fileInputRef.current.value = "";
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="default" onClick={applyUploadedCategoryChanges}>
+              Confirm Updates
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

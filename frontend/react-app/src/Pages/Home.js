@@ -5,6 +5,7 @@ import {
   Import,
   ChartNoAxesCombined,
   IndianRupee,
+  ReceiptText,
 } from "lucide-react";
 import ReportGenerator from "../components/MainDashboardComponents/GenerateReport";
 import { cn } from "../lib/utils";
@@ -23,12 +24,14 @@ import { useBreadcrumb } from "../contexts/BreadcrumbContext";
 import { useParams } from "react-router-dom";
 import PdfColumnMarker from "../components/MainDashboardComponents/PdfMarker";
 import TallyPrimeDirect from "../components/ImortTally/TallyDirectImport";
+import TallyPrime from "../components/ImortTally/TallyPrime";
+import { useReportContext } from "../contexts/ReportContext";
 
 const Dashboard = () => {
   const { breadcrumbs, setMainDashboard } = useBreadcrumb();
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [pdfColMarkerData, setPdfColMarkerData] = useState([]);
   const { defaultTab } = useParams();
+  const { reportData, updateReportData } = useReportContext();
 
   const navItems = [
     {
@@ -53,15 +56,20 @@ const Dashboard = () => {
       icon: Import,
       items: [
         {
-          title: "TallyPrime",
+          title: "Tally Manual",
           url: "#",
           icon: null,
         },
         {
-          title: "TallyERP",
+          title: "Tally Vouchers",
           url: "#",
           icon: null,
         },
+        // {
+        //   title: "TallyERP Vouchers",
+        //   url: "#",
+        //   icon: null,
+        // },
       ],
       alwaysOpen: true, // Ensures the section remains open
     },
@@ -70,6 +78,7 @@ const Dashboard = () => {
       url: "#",
       icon: IndianRupee,
     },
+
     // {
     //   title: "Billing",
     //   url: "#",
@@ -83,9 +92,18 @@ const Dashboard = () => {
   ];
 
   useEffect(() => {
+    console.log({defaultTab})
     if (!defaultTab || defaultTab === "defaultTab")
       setActiveTab(navItems[0].title);
     else setActiveTab(defaultTab);
+
+    updateReportData({
+      ...reportData,
+      reportName: null,
+      caseId: null,
+      individualId: null,
+      customerName: null,
+    });
   }, []);
 
   useEffect(() => {
@@ -102,31 +120,6 @@ const Dashboard = () => {
     }
   };
 
-  const handleFinalSubmitPDFMarker = () => {
-    const data = {
-      bank_names: ["HDFC", "ICICI"],
-      pdf_paths: ["/home/Downloads/ICICI.pdf", "/home/Downloads/HDFC.pdf"],
-      passwords: ["1234", "1234"],
-      start_dates: ["01-01-2021", "01-01-2021"],
-      end_dates: ["31-12-2021", "31-12-2021"],
-      CA_ID: 1,
-      columns: pdfColMarkerData,
-    };
-    console.log(data);
-  };
-
-  useEffect(() => {
-    const data = {
-      bank_names: ["HDFC", "ICICI"],
-      pdf_paths: ["/home/Downloads/ICICI.pdf", "/home/Downloads/HDFC.pdf"],
-      passwords: ["1234", "1234"],
-      start_dates: ["01-01-2021", "01-01-2021"],
-      end_dates: ["31-12-2021", "31-12-2021"],
-      CA_ID: 1,
-      columns: pdfColMarkerData,
-    };
-    console.log(data);
-  }, [pdfColMarkerData]);
 
   return (
     <>
@@ -140,18 +133,17 @@ const Dashboard = () => {
           <BreadcrumbDynamic items={breadcrumbs} />
           <div className="flex-1 flex flex-col overflow-hidden">
             <main className="flex-1">
-              {activeTab === "Dashboard" && <MainDashboard />}
+              {activeTab === "Dashboard" && <MainDashboard handleTabChange={handleTabChange} />}
               {activeTab === "Generate Report" && <ReportGenerator />}
               {activeTab === "Opportunity to Earn" && <Eligibility />}
               {activeTab === "Billing" && <Billing />}
 
               {activeTab === "Analytics" && <Analytics />}
-              {activeTab === "Marker" && (
-                <PdfColumnMarker setPdfColMarkerData={setPdfColMarkerData} />
+              {activeTab === "Tally Vouchers" && <TallyPrime />}
+              {activeTab === "Tally Manual" && (
+                <TallyPrimeDirect source="manual" />
               )}
-              {/* {activeTab === "Import to Tally" && <ImportToTally />} */}
-              {activeTab === "TallyPrime" && <TallyPrimeDirect />}
-              {activeTab === "TallyERP" && <ExcelERP />}
+              {activeTab === "TallyERP Vouchers" && <ExcelERP />}
             </main>
           </div>
         </ScrollArea>

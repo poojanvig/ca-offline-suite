@@ -78,7 +78,7 @@ const EMI = () => {
 
   const processEmiSummary = (transactions) => {
     const grouped = [];
-    const threshold = 0.7;
+    const threshold = 0.85;
   
     transactions.forEach((transaction) => {
       const existing = grouped.find(
@@ -113,6 +113,28 @@ const EMI = () => {
   const filteredData = data.filter(item => 
     selectedMonths.includes(item.monthKey)
   );
+
+  // Transform data for chart to show monthly aggregates
+  const getChartData = () => {
+    const monthlyData = {};
+    
+    filteredData.forEach(item => {
+      if (!monthlyData[item.monthKey]) {
+        monthlyData[item.monthKey] = {
+          date: item.monthKey, // Using monthKey as date for x-axis
+          debit: 0
+        };
+      }
+      monthlyData[item.monthKey].debit += item.debit;
+    });
+
+    return Object.values(monthlyData).sort((a, b) => {
+      const dateA = getMonthDate(a.date);
+      const dateB = getMonthDate(b.date);
+      return dateA - dateB;
+    });
+  };
+
   if (loading) {
     return (
       <div className="bg-gray-100 p-4 rounded-md w-full h-[10vh]">
@@ -142,15 +164,15 @@ const EMI = () => {
   
         {selectedMonths.length === 0 ? (
           <div className="text-center text-gray-600 dark:text-gray-400 my-6">
-            Select months to display the graphs
+            Select months to view data
           </div>
         ) : (
           <>
             <div className="w-full h-[60vh]">
               <BarLineChart
                 xAxisKey="date"
-                yAxisKey="balance"
-                data={filteredData}
+                yAxisKey="debit"
+                data={getChartData()}
                 title="Probable EMI"
               />
             </div>
